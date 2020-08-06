@@ -12,7 +12,7 @@ def load_executor_class(class_name, required_packages):
 
     :param class_name: the executor class to load
     :type class_name: str
-    :param required_packages: the required packages to install, ignored if None or empty string
+    :param required_packages: the required packages to install (in pip format, get split on space), ignored if None or empty string
     :type required_packages: str
     :return: the class object
     :rtype: class
@@ -24,7 +24,7 @@ def load_executor_class(class_name, required_packages):
     if required_packages is not None and (required_packages == ""):
         required_packages = None
     if required_packages is not None:
-        require_class(module_name, class_name, packages=required_packages)
+        require_class(module_name, class_name, packages=required_packages.split(" "))
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
