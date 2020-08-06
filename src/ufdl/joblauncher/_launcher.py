@@ -1,4 +1,5 @@
 import importlib
+import math
 import psutil
 import subprocess
 from wai.lazypip import require_class
@@ -53,6 +54,35 @@ def to_bytes(s):
         factor = 1024 * 1024 * 1024 * 1024
         s = s[:-4].strip()
     return int(s) * factor
+
+
+def to_hardware_generation(compute):
+    """
+    Turns the compute number into a hardware generation string
+
+    :param compute: the compute number
+    :type compute: float
+    :return: the hardware generation
+    :rtype: str
+    """
+    if compute == 8.0:
+        return "Ampere"
+    elif compute == 7.5:
+        return "Turing"
+    elif math.floor(compute) == 7.0:
+        return "Volta"
+    elif math.floor(compute) == 6.0:
+        return "Volta"
+    elif math.floor(compute) == 5.0:
+        return "Pascal"
+    elif math.floor(compute) == 4.0:
+        return "Maxwell"
+    elif math.floor(compute) == 3.0:
+        return "Kepler"
+    elif math.floor(compute) == 2.0:
+        return "Fermi"
+    else:
+        raise Exception("Unhandled compute version: " + str(compute))
 
 
 def hardware_info():
@@ -115,6 +145,7 @@ def hardware_info():
                         gpus[major + "." + minor] = dict()
                 elif "Architecture" in line:
                     gpus[major + "." + minor]['compute'] = float(parts[1])
+                    gpus[major + "." + minor]['generation'] = to_hardware_generation(float(parts[1]))
                 elif "Model" in line:
                     gpus[major + "." + minor]['model'] = parts[1]
                 elif "Brand" in line:
