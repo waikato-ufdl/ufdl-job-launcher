@@ -56,6 +56,27 @@ def to_bytes(s):
 
 
 def hardware_info():
+    """
+    Collects hardware information with the following keys (memory is in bytes):
+    - memory
+      - total
+      - used
+      - free
+    - gpus (if available)
+      - device ID (major.minor)
+        - model (GeForce RTX 2080 Ti)
+        - brand (GeForce)
+        - uuid (GPU-AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE)
+        - bus (00000000:01:00.0)
+        - compute (7.5)
+        - memory
+          - total
+          - used
+          - free
+
+    :return: the hardware info
+    :rtype: dict
+    """
     hardware = dict()
     gpus = dict()
     has_gpu = False
@@ -108,6 +129,7 @@ def hardware_info():
     # gpu memory
     try:
         res = subprocess.run(["nvidia-smi", "-q", "-d", "MEMORY"], stdout=subprocess.PIPE)
+        has_gpu = True
         lines = res.stdout.decode().split("\n")
         bus = ""
         fb = False
