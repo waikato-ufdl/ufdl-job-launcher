@@ -1,0 +1,620 @@
+import getpass
+import os
+import shutil
+import subprocess
+from subprocess import CompletedProcess
+import tempfile
+import traceback
+from zipfile import ZipFile
+from ufdl.pythonclient import UFDLServerContext
+from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
+
+KEY_CPU = 'cpu'
+
+KEY_IMAGE_URL = 'url'
+
+KEY_REGISTRY_PASSWORD = 'registry_password'
+
+KEY_REGISTRY_USERNAME = 'registry_username'
+
+KEY_REGISTRY_URL = 'registry_url'
+
+KEY_DOCKER_IMAGE = "docker_image"
+
+
+class AbstractJobExecutor(object):
+    """
+    Ancestor for classes executing jobs.
+    """
+
+    def __init__(self, context, workdir, use_sudo=False, ask_sudo_pw=False):
+        """
+        Initializes the executor with the backend context.
+
+        :param context: the server context
+        :type context: UFDLServerContext
+        :param workdir: the working directory to use
+        :type workdir: str
+        :param use_sudo: whether to prefix commands with sudo
+        :type use_sudo: bool
+        :param ask_sudo_pw: whether to prompt user in console for sudo password
+        :type ask_sudo_pw: bool
+        """
+        self._debug = False
+        self._context = context
+        self._workdir = workdir
+        self._jobdir = None
+        self._use_sudo = use_sudo
+        self._ask_sudo_pw = ask_sudo_pw
+
+    @property
+    def debug(self):
+        """
+        Returns the debugging mode flag.
+
+        :return: True if debugging mode on
+        :rtype: bool
+        """
+        return self._debug
+
+    @debug.setter
+    def debug(self, value):
+        """
+        Sets the debug flag.
+
+        :param value: True to turn on debugging mode
+        :type value: bool
+        """
+        self._debug = value
+
+    @property
+    def context(self):
+        """
+        Returns the UFDL server context.
+
+        :return: the context
+        :rtype: UFDLServerContext
+        """
+        return self._context
+
+    @property
+    def workdir(self):
+        """
+        Returns the working directory. Used for temp files and dirs.
+
+        :return: the directory
+        :rtype: str
+        """
+        return self._workdir
+
+    @property
+    def jobdir(self):
+        """
+        Returns the working directory. Used for temp files and dirs.
+
+        :return: the directory for the job (gets created before actual run and deleted afterwards again)
+        :rtype: str
+        """
+        return self._jobdir
+
+    @property
+    def use_sudo(self):
+        """
+        Returns whether commands are prefixed with sudo.
+
+        :return: true if prefixing commands
+        :rtype: bool
+        """
+        return self._use_sudo
+
+    @property
+    def ask_sudo_pw(self):
+        """
+        Returns whether to prompt user in console for sudo password.
+
+        :return: true if prompting
+        :rtype: bool
+        """
+        return self._ask_sudo_pw
+
+    def _mktmpdir(self):
+        """
+        Creates a temp directory in the working directory and returns the absolute path.
+
+        :return: the tmp directory that has been created
+        :rtype: str
+        """
+        return tempfile.mkdtemp(suffix="", prefix="", dir=self.workdir)
+
+    def _mkdir(self, dir):
+        """
+        Creates the specified directory.
+
+        :param dir: the directory to create
+        :type dir: str
+        """
+        if self.debug:
+            print("mkdir:", dir)
+        os.mkdir(dir)
+
+    def _rmdir(self, dir):
+        """
+        Removes the directory recursively.
+
+        :param dir: the directory to delete
+        :type dir: str
+        """
+        if self.debug:
+            print("rmdir:", dir)
+        shutil.rmtree(dir, ignore_errors=True)
+
+    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=False):
+        """
+        Executes the command.
+
+        :param cmd: the command as list of strings
+        :type cmd: list
+        :param always_return: whether to always return the subprocess.CompletedProcess object or only
+                              if the returncode is non-zero
+        :type always_return: bool
+        :param no_sudo: temporarily disable sudo
+        :type no_sudo: bool
+        :param capture_output: whether to capture the output from stdout and stderr
+        :type capture_output: bool
+        :return: the CompletedProcess object from executing the command, uses 255 as return code in case of an
+                 exception and stores the stack trace in stderr
+        :rtype: subprocess.CompletedProcess
+        """
+
+        full = []
+        if self.use_sudo:
+            if no_sudo is None or no_sudo is False:
+                full.append("sudo")
+                if self.ask_sudo_pw:
+                    full.append("-S")
+        full.extend(cmd)
+
+        if self.debug:
+            print("Executing:", " ".join(full))
+
+        try:
+            result = subprocess.run(full, capture_output=capture_output)
+        except:
+            result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
+
+        if always_return or (result.returncode > 0):
+            return result
+        else:
+            return None
+        
+    def _compress(self, files, zipfile, strippath=None):
+        """
+        Compresses the files and stores them in the zip file.
+        
+        :param files: the list of files to compress
+        :type files: list  
+        :param zipfile: the zip file to create
+        :type zipfile: str
+        :param strippath: whether to strip the path: True for removing completely, or prefix string to remove
+        :type strippath: bool or str
+        :return: None if successful, otherwise error message
+        :rtype: str
+        """
+
+        if self.debug:
+            print("Compressing:", files, "->", zipfile)
+
+        try:
+            with ZipFile(zipfile, "w") as zf:
+                for f in files:
+                    arcname = None
+                    if strippath is not None:
+                        if isinstance(strippath, bool):
+                            arcname = os.path.basename(f)
+                        elif f.startswith(strippath):
+                            arcname = f[len(strippath):]
+                        if arcname.startswith("/"):
+                            arcname = arcname[1:]
+                    zf.write(f, arcname=arcname)
+            return None
+        except:
+            return "Failed to compress files '%s' into '%s':\n%s" \
+                   % (",".join(files), zipfile, traceback.format_exc())
+
+    def _decompress(self, zipfile, output_dir):
+        """
+        Decompresses a zipfile into the specified output directory.
+
+        :param zipfile: the zip file to decompress
+        :type zipfile: str
+        :param output_dir: the output directory
+        :type output_dir: str
+        """
+
+        if self.debug:
+            print("Decompressing:", zipfile, "->", output_dir)
+
+        try:
+            with ZipFile(zipfile, "r") as zf:
+                zf.extractall(output_dir)
+        except:
+            return "Failed to decompress '%s' to '%s':\n%s" \
+                   % (zipfile, output_dir, traceback.format_exc())
+
+    def _input(self, name, job, template):
+        """
+        Returns the input variable description.
+        Raises an exception if the template doesn't define it.
+
+        :param job: the job dictionary
+        :type job: dict
+        :param template: the template dictionary (for defaults)
+        :type template: dict
+        :param name: the name of the input to retrieve
+        :return: the dictionary with name, type, value
+        :rtype: dict
+        """
+        default = None
+        for input in template['inputs']:
+            if input['name'] == name:
+                default = input
+                break
+        if default is None:
+            raise Exception("Input '%s' not found in template!\n%s" % (name, str(template)))
+        supplied = None
+        for input in job['inputs']:
+            if input['name'] == name:
+                supplied = input
+                break
+
+        result = dict()
+        result['name'] = name
+        result['type'] = default['type']
+        if supplied is None:
+            result['value'] = default['default']
+            if 'options' in default:
+                result['options'] = default['options']
+        else:
+            result['value'] = supplied['value']
+            if 'options' in supplied:
+                result['options'] = supplied['options']
+            else:
+                result['options'] = default['options']
+        if 'options' not in result:
+            result['options'] = ''
+
+        return result
+
+    def _parameter(self, name, job, template):
+        """
+        Returns the parameter description.
+        Raises an exception if the template doesn't define it.
+
+        :param job: the job dictionary
+        :type job: dict
+        :param template: the template dictionary (for defaults)
+        :type template: dict
+        :param name: the name of the parameter to retrieve
+        :return: the dictionary with name, type, value
+        :rtype: dict
+        """
+        default = None
+        for param in template['parameters']:
+            if param['name'] == name:
+                default = param
+                break
+        if default is None:
+            raise Exception("Parameter '%s' not found in template!\n%s" % (name, str(template)))
+        supplied = None
+        for param in job['parameters']:
+            if param['name'] == name:
+                supplied = param
+                break
+
+        result = dict()
+        result['name'] = name
+        result['type'] = default['type']
+        if supplied is None:
+            result['value'] = default['default']
+        else:
+            result['value'] = supplied['value']
+
+        return result
+
+    def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strippath=True):
+        """
+        Compresses the files as zip file and uploads them as job output under the specified name.
+
+        :param job_pk: the PK of the job this output is for
+        :type job_pk: int
+        :param output_name: the job output name to use
+        :type output_name: str
+        :param output_type: the job output type to use (eg model, tensorboard, json)
+        :type output_type: str
+        :param files: the list of files to compress
+        :type files: list
+        :param zipfile: the zip file to store the files in
+        :type zipfile: str
+        :param strippath: whether to strip the path from the files (None, True or path-prefix to remove)
+        :type strippath: bool or str
+        """
+        self._compress(files, zipfile, strippath=strippath)
+        # TODO upload to backend
+
+    def _pre_run(self, template, job):
+        """
+        Hook method before the actual job is run.
+
+        :param template: the job template to apply
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        """
+        self._jobdir = self._mktmpdir()
+        if self.debug:
+            print("Created jobdir:", self.jobdir)
+
+    def _do_run(self, template, job):
+        """
+        Executes the actual job. Only gets run if pre-run was successful.
+
+        :param template: the job template to apply
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        """
+        raise NotImplemented()
+
+    def _post_run(self, template, job, pre_run_success, do_run_success):
+        """
+        Hook method after the actual job has been run. Will always be executed.
+
+        :param template: the job template that was applied
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        :param pre_run_success: whether the pre_run code was successfully run
+        :type pre_run_success: bool
+        :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
+        :type do_run_success: bool
+        """
+        if not self._debug:
+            self._rmdir(self.jobdir)
+        self._jobdir = None
+
+    def run(self, template, job):
+        """
+        Applies the template and executes the job. Raises an exception if it fails.
+
+        :param template: the job template to apply
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        :return:
+        """
+        pre_run_success = False
+        do_run_success = False
+        try:
+            self._pre_run(template, job)
+            pre_run_success = True
+        except:
+            print("Failed to execute pre-run code:")
+            print(traceback.format_exc())
+
+        if pre_run_success:
+            try:
+                self._do_run(template, job)
+                do_run_success = True
+            except:
+                print("Failed to execute do-run code:")
+                print(traceback.format_exc())
+
+        try:
+            self._post_run(template, job, pre_run_success, do_run_success)
+        except:
+            print("Failed to execute post-run code:")
+            print(traceback.format_exc())
+
+    def __str__(self):
+        """
+        Returns a short description of itself.
+
+        :return: the short description
+        :rtype: str
+        """
+        return "context=" + str(self.context) + ", workdir=" + self.workdir
+
+
+class AbstractDockerJobExecutor(AbstractJobExecutor):
+    """
+    For executing jobs via docker images.
+    """
+
+    def __init__(self, context, workdir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
+        """
+        Initializes the executor with the backend context.
+
+        :param context: the server context
+        :type context: UFDLServerContext
+        :param workdir: the working directory to use
+        :type workdir: str
+        :param use_sudo: whether to prefix commands with sudo
+        :type use_sudo: bool
+        :param ask_sudo_pw: whether to prompt user in console for sudo password
+        :type ask_sudo_pw: bool
+        :param use_current_user: whether to run as root (False) or as user launching the image (True)
+        :type use_current_user: bool
+        """
+        super(AbstractDockerJobExecutor, self).__init__(
+            context, workdir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw)
+        self._use_current_user = use_current_user
+        self._use_gpu = False
+        self._docker_image = None
+
+    @property
+    def use_current_user(self):
+        """
+        Returns whether the image is run as root (False) or as current user (True).
+
+        :return: how the image is run
+        :rtype: bool
+        """
+        return self._use_current_user
+
+    def _version(self, include_patch=True):
+        """
+        Returns the docker version.
+
+        :param include_patch: whether to include the patch version as well next to major/minor
+        :type include_patch: bool
+        :return: the version string, None if failed to obtain
+        :rtype: str
+        """
+
+        res = self._execute(["docker", "--version"], no_sudo=True, capture_output=True)
+        if res.returncode > 0:
+            return None
+
+        result = res.stdout.decode().strip()
+        if result.startswith("Docker version"):
+            result = result.replace("Docker version ", "")
+        if "," in result:
+            result = result.split(",")[0]
+        if not include_patch:
+            if "." in result:
+                parts = result.split(".")
+                if len(parts) >= 2:
+                    result = parts[0] + "." + parts[1]
+
+        return result
+
+    def _gpu_flags(self):
+        """
+        If the GPU is to be used, returns the relevant flags as list.
+
+        :return: the list of flags, empty list if none required
+        :rtype: list
+        """
+        result = []
+
+        if self._use_gpu:
+            version = self._version(include_patch=False)
+            if version is not None:
+                version_num = float(version)
+                if version_num >= 19.03:
+                    result.append("--gpus=all")
+                else:
+                    result.append("--runtime=nvidia")
+
+        return result
+
+    def _login_registry(self, registry, user, password):
+        """
+        Logs into the specified registry.
+
+        :param registry: the registry URL to log into
+        :type registry: str
+        :param user: the user name for the registry
+        :type user: str
+        :param password: the password for the registry
+        :type password: str
+        :return: None if successfully logged in, otherwise subprocess.CompletedProcess
+        :rtype: subprocess.CompletedProcess
+        """
+        return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False)
+
+    def _logout_registry(self, registry):
+        """
+        Logs out of the specified registry.
+
+        :param registry: the registry URL to log out from
+        :type registry: str
+        :return: None if successfully logged out, otherwise subprocess.CompletedProcess
+        :rtype: subprocess.CompletedProcess
+        """
+        return self._execute(["docker", "logout", registry], always_return=False)
+
+    def _pull_image(self, image):
+        """
+        Pulls the requested image.
+
+        :param image: the image to pull
+        :type image: str
+        :return: None if successfully pulled, otherwise subprocess.CompletedProcess
+        :rtype: subprocess.CompletedProcess
+        """
+        return self._execute(["docker", "pull", image], always_return=False)
+
+    def _run_image(self, image, docker_args=None, volumes=None, image_args=None):
+        """
+        Runs the image with the specified parameters.
+
+        :param image: the URL of the image to run
+        :type image: str
+        :param docker_args: the arguments for docker (eg: --gpus=all --shm-size 8G -ti -u $(id -u):$(id -g) -e USER=$USER)
+        :type docker_args: list
+        :param volumes: the volumes to map (eg: /some/where/models:/models)
+        :type volumes: list
+        :param image_args: the command and arguments to supply to the docker image for execution
+        :type image_args: list
+        :return: None if successfully executed, otherwise subprocess.CompletedProcess
+        :rtype: subprocess.CompletedProcess
+        """
+        cmd = ["docker", "run"]
+        if docker_args is None:
+            docker_args = []
+        docker_args.extend(self._gpu_flags())
+        if self.use_current_user:
+            docker_args.extend([
+                "-u", "%d:%d" % (os.getuid(), os.getgid()),
+                "-e", "USER=%s" % getpass.getuser(),
+            ])
+        cmd.extend(docker_args)
+        if volumes is not None:
+            for volume in volumes:
+                cmd.extend(["-v", volume])
+        cmd.append(image)
+        if image_args is not None:
+            cmd.extend(image_args)
+        return self._execute(cmd, always_return=False)
+
+    def _pre_run(self, template, job):
+        """
+        Hook method before the actual job is run.
+
+        :param template: the job template to apply
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        """
+        super()._pre_run(template, job)
+
+        # docker image
+        if KEY_DOCKER_IMAGE not in job:
+            raise Exception("Docker image PK not defined in job (key: %s)!\n%s" % (KEY_DOCKER_IMAGE, str(job)))
+        self._docker_image = docker_retrieve(self.context, int(job[KEY_DOCKER_IMAGE]))
+        self._login_registry(
+            self._docker_image[KEY_REGISTRY_URL],
+            self._docker_image[KEY_REGISTRY_USERNAME],
+            self._docker_image[KEY_REGISTRY_PASSWORD])
+        self._use_gpu = not bool(self._docker_image[KEY_CPU])
+        self._pull_image(self._docker_image[KEY_IMAGE_URL])
+
+    def _post_run(self, template, job, pre_run_success, do_run_success):
+        """
+        Hook method after the actual job has been run. Will always be executed.
+
+        :param template: the job template that was applied
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        :param pre_run_success: whether the pre_run code was successfully run
+        :type pre_run_success: bool
+        :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
+        :type do_run_success: bool
+        """
+        if self._docker_image is not None:
+            self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
+            self._docker_image = None
+
+        super()._post_run(template, job, pre_run_success, do_run_success)

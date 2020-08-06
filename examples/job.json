@@ -1,0 +1,23 @@
+{
+  "pk": 1,
+  "template": 1,
+  "docker_image": 6,
+  "inputs":
+  [
+    {
+      "name": "data",
+      "value": "1"
+    }
+  ],
+  "parameters":
+  [
+    {
+      "name": "steps",
+      "value": "1000"
+    },
+    {
+      "name": "model",
+      "value": "https://tfhub.dev/google/efficientnet/b0/feature-vector/1"
+    }
+  ]
+}

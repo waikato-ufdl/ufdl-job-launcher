@@ -1,0 +1,31 @@
+{
+  "name": "tf_image_class_efficientnet_b0",
+  "version": "1",
+  "scope": "public",
+  "domain": "classify",
+  "type": "train",
+  "executor_class": "ufdl.joblauncher.classify.ImageClassificationTrain_TF_1_14",
+  "required_packages": "",
+  "inputs":
+  [
+    {
+      "name": "data",
+      "type": "dataset",
+      "options": "to-subdir"
+    }
+  ],
+  "parameters":
+  [
+    {
+      "name": "steps",
+      "type": "int",
+      "default": "50000"
+    },
+    {
+      "name": "model",
+      "type": "model",
+      "default": "https://tfhub.dev/google/efficientnet/b0/feature-vector/1"
+    }
+  ],
+  "template": "unused"
+}
