@@ -42,5 +42,6 @@ setup(
         "wai.lazypip",
         "pika",
         "tensorflow",
+        "psutil",
     ],
 )
