@@ -66,15 +66,17 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         :type job: dict
         """
 
+        image = self._docker_image['url']
+        volumes=[
+            self.jobdir + "/data" + ":/data",
+            self.jobdir + "/output" + ":/output",
+            self.jobdir + "/models" + ":/models",
+        ]
+
+        # build model
         self._run_image(
-            self._docker_image['url'],
-            docker_args=[
-            ],
-            volumes=[
-                self.jobdir + "/data" + ":/data",
-                self.jobdir + "/output" + ":/output",
-                self.jobdir + "/models" + ":/models",
-                ],
+            image,
+            volumes=volumes,
             image_args=[
                 "tfic-retrain",
                 "--image_dir", "/data",
@@ -92,6 +94,24 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
                 "--tfhub_module", self._parameter('model', job, template)['value'],
             ]
         )
+
+        # stats?
+        if bool(self._parameter('generate-stats', job, template)['value']):
+            for t in ["training", "testing", "validation"]:
+                self._run_image(
+                    image,
+                    volumes=volumes,
+                    image_args=[
+                        "tfic-stats",
+                        "--image_dir", "/data",
+                        "--image_list", "/output/%s.json" % t,
+                        "--graph", "/output/graph.pb",
+                        "--info", "/output/info.json",
+                        "--output_preds", "/output/%s-predictions.csv" % t,
+                        "--output_stats", "/output/%s-stats.csv" % t,
+                    ]
+                )
+
 
     def _post_run(self, template, job, pre_run_success, do_run_success):
         """
@@ -140,5 +160,12 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
             pk, "image_lists", "json",
             glob(self.jobdir + "/output/*.json"),
             self.jobdir + "/image_lists.zip")
+
+        # zip+upload predictions/stats
+        if bool(self._parameter('generate-stats', job, template)['value']):
+            self._compress_and_upload(
+                pk, "statistics", "csv",
+                glob(self.jobdir + "/output/*.csv"),
+                self.jobdir + "/statistics.zip")
 
         super()._post_run(template, job, pre_run_success, do_run_success)

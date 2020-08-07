@@ -25,6 +25,11 @@
       "name": "model",
       "type": "model",
       "default": "https://tfhub.dev/google/efficientnet/b0/feature-vector/1"
+    },
+    {
+      "name": "generate-stats",
+      "type": "bool",
+      "default": "false"
     }
   ],
   "template": "unused"
