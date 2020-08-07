@@ -126,27 +126,27 @@ class AbstractJobExecutor(object):
         """
         return tempfile.mkdtemp(suffix="", prefix="", dir=self.workdir)
 
-    def _mkdir(self, dir):
+    def _mkdir(self, directory):
         """
         Creates the specified directory.
 
-        :param dir: the directory to create
-        :type dir: str
+        :param directory: the directory to create
+        :type directory: str
         """
         if self.debug:
-            print("mkdir:", dir)
-        os.mkdir(dir)
+            print("mkdir:", directory)
+        os.mkdir(directory)
 
-    def _rmdir(self, dir):
+    def _rmdir(self, directory):
         """
         Removes the directory recursively.
 
-        :param dir: the directory to delete
-        :type dir: str
+        :param directory: the directory to delete
+        :type directory: str
         """
         if self.debug:
-            print("rmdir:", dir)
-        shutil.rmtree(dir, ignore_errors=True)
+            print("rmdir:", directory)
+        shutil.rmtree(directory, ignore_errors=True)
 
     def _execute_can_use_stdin(self, no_sudo=None):
         """
@@ -279,16 +279,16 @@ class AbstractJobExecutor(object):
         :rtype: dict
         """
         default = None
-        for input in template['inputs']:
-            if input['name'] == name:
-                default = input
+        for _input in template['inputs']:
+            if _input['name'] == name:
+                default = _input
                 break
         if default is None:
             raise Exception("Input '%s' not found in template!\n%s" % (name, str(template)))
         supplied = None
-        for input in job['inputs']:
-            if input['name'] == name:
-                supplied = input
+        for _input in job['inputs']:
+            if _input['name'] == name:
+                supplied = _input
                 break
 
         result = dict()
