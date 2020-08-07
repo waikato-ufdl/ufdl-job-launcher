@@ -36,6 +36,7 @@ setup(
     author='Peter Reutemann',
     author_email='fracpete@waikato.ac.nz',
     install_requires=[
+        "wai.lazypip",
         "wai.annotations",
         "ufdl.pythonclient",
         "ufdl.json-messages",
