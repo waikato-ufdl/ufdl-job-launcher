@@ -148,7 +148,7 @@ class AbstractJobExecutor(object):
             print("rmdir:", dir)
         shutil.rmtree(dir, ignore_errors=True)
 
-    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=False):
+    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=False, stdin=None):
         """
         Executes the command.
 
@@ -161,6 +161,8 @@ class AbstractJobExecutor(object):
         :type no_sudo: bool
         :param capture_output: whether to capture the output from stdout and stderr
         :type capture_output: bool
+        :param stdin: the text to feed into the process via stdin
+        :type stdin: str
         :return: the CompletedProcess object from executing the command, uses 255 as return code in case of an
                  exception and stores the stack trace in stderr
         :rtype: subprocess.CompletedProcess
@@ -172,13 +174,21 @@ class AbstractJobExecutor(object):
                 full.append("sudo")
                 if self.ask_sudo_pw:
                     full.append("-S")
+                    if stdin is not None:
+                        raise Exception("Cannot feed into stdin if sudo is asking for password!")
         full.extend(cmd)
 
         if self.debug:
             print("Executing:", " ".join(full))
 
         try:
-            result = subprocess.run(full, capture_output=capture_output)
+            if stdin is not None:
+                if not stdin.endswith("\n"):
+                    stdin = stdin + "\n"
+                result = subprocess.run(full, capture_output=capture_output, stdin=subprocess.PIPE)
+                result.stdin.write(stdin)
+            else:
+                result = subprocess.run(full, capture_output=capture_output)
         except:
             result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
 
@@ -521,7 +531,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: None if successfully logged in, otherwise subprocess.CompletedProcess
         :rtype: subprocess.CompletedProcess
         """
-        return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False)
+        return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password)
 
     def _logout_registry(self, registry):
         """
