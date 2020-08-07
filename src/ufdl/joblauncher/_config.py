@@ -40,7 +40,7 @@ def load_config(config_file=None):
 
     config = configparser.ConfigParser()
     config.read(config_file)
-    _check_section(config_file, config, "general", ["debug"])
+    _check_section(config_file, config, "general", ["debug", "compression"])
     _check_section(config_file, config, "backend", ["url", "user", "password"])
     _check_section(config_file, config, "docker", ["workdir", "use_current_user"])
     _check_section(config_file, config, "rabbitmq", ["host", "port", "queue"])

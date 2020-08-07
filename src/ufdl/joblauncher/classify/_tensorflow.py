@@ -40,8 +40,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         data = self.jobdir + "/data.zip"
         pk = int(self._input("data", job, template)["value"])
         options = self._input("data", job, template)["options"]
-        if self.debug:
-            print("Downloading dataset:", pk, "-> options=", options, "->", data)
+        self._log_msg("Downloading dataset:", pk, "-> options=", options, "->", data)
         with open(data, "wb") as zip_file:
             for b in dataset_download(self.context, pk, annotations_args=options):
                 zip_file.write(b)

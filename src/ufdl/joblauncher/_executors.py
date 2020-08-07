@@ -1,11 +1,13 @@
+from datetime import datetime
 import getpass
+import json
 import os
 import shutil
 import subprocess
 from subprocess import CompletedProcess
 import tempfile
 import traceback
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 
@@ -46,6 +48,8 @@ class AbstractJobExecutor(object):
         self._jobdir = None
         self._use_sudo = use_sudo
         self._ask_sudo_pw = ask_sudo_pw
+        self._log = list()
+        self._compression = ZIP_STORED
 
     @property
     def debug(self):
@@ -66,6 +70,26 @@ class AbstractJobExecutor(object):
         :type value: bool
         """
         self._debug = value
+
+    @property
+    def compression(self):
+        """
+        Returns the compression in use.
+
+        :return: the compression (see zipfile, ZIP_STORED/0 = no compression)
+        :rtype: int
+        """
+        return self._compression
+
+    @compression.setter
+    def compression(self, value):
+        """
+        Sets the compression to use.
+
+        :param value: the compression (see zipfile, ZIP_STORED/0 = no compression)
+        :type value: int
+        """
+        self._compression = value
 
     @property
     def context(self):
@@ -117,6 +141,27 @@ class AbstractJobExecutor(object):
         """
         return self._ask_sudo_pw
 
+    def _add_log(self, data):
+        """
+        Adds the data under a new timestamp to the internal log.
+
+        :param data: the object to add
+        :type data: object
+        """
+        entry = dict()
+        entry['timestamp'] = str(datetime.now())
+        entry['data'] = data
+        self._log.append(entry)
+
+    def _log_msg(self, *args):
+        """
+        For logging debugging messages.
+
+        :param args: the arguments to log, get turned into a string, blank separated (similar to print)
+        """
+        str_args = [str(x) for x in args]
+        self._add_log(" ".join(str_args))
+
     def _mktmpdir(self):
         """
         Creates a temp directory in the working directory and returns the absolute path.
@@ -133,8 +178,7 @@ class AbstractJobExecutor(object):
         :param directory: the directory to create
         :type directory: str
         """
-        if self.debug:
-            print("mkdir:", directory)
+        self._log_msg("mkdir:", directory)
         os.mkdir(directory)
 
     def _rmdir(self, directory):
@@ -144,8 +188,7 @@ class AbstractJobExecutor(object):
         :param directory: the directory to delete
         :type directory: str
         """
-        if self.debug:
-            print("rmdir:", directory)
+        self._log_msg("rmdir:", directory)
         shutil.rmtree(directory, ignore_errors=True)
 
     def _execute_can_use_stdin(self, no_sudo=None):
@@ -161,7 +204,7 @@ class AbstractJobExecutor(object):
                     return False
         return True
 
-    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=False, stdin=None):
+    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=True, stdin=None):
         """
         Executes the command.
 
@@ -192,8 +235,7 @@ class AbstractJobExecutor(object):
                     full.append("-S")
         full.extend(cmd)
 
-        if self.debug:
-            print("Executing:", " ".join(full))
+        self._log_msg("Executing:", " ".join(full))
 
         try:
             if stdin is not None:
@@ -205,6 +247,15 @@ class AbstractJobExecutor(object):
                 result = subprocess.run(full, capture_output=capture_output)
         except:
             result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
+
+        log_data = dict()
+        log_data['cmd'] = result.args
+        if result.stdout is not None:
+            log_data['stdout'] = result.stdout.decode()
+        if result.stdout is not None:
+            log_data['stderr'] = result.stderr.decode()
+        log_data['returncode'] = result.returncode
+        self._add_log(log_data)
 
         if always_return or (result.returncode > 0):
             return result
@@ -225,11 +276,10 @@ class AbstractJobExecutor(object):
         :rtype: str
         """
 
-        if self.debug:
-            print("Compressing:", files, "->", zipfile)
+        self._log_msg("Compressing:", files, "->", zipfile)
 
         try:
-            with ZipFile(zipfile, "w") as zf:
+            with ZipFile(zipfile, "w", compression=self._compression) as zf:
                 for f in files:
                     arcname = None
                     if strippath is not None:
@@ -255,8 +305,7 @@ class AbstractJobExecutor(object):
         :type output_dir: str
         """
 
-        if self.debug:
-            print("Decompressing:", zipfile, "->", output_dir)
+        self._log_msg("Decompressing:", zipfile, "->", output_dir)
 
         try:
             with ZipFile(zipfile, "r") as zf:
@@ -375,8 +424,7 @@ class AbstractJobExecutor(object):
         :type job: dict
         """
         self._jobdir = self._mktmpdir()
-        if self.debug:
-            print("Created jobdir:", self.jobdir)
+        self._log_msg("Created jobdir:", self.jobdir)
 
     def _do_run(self, template, job):
         """
@@ -402,6 +450,15 @@ class AbstractJobExecutor(object):
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
         :type do_run_success: bool
         """
+        log = self.jobdir + "/log.json"
+        try:
+            with open(self.jobdir + "/log.json", "w") as log_file:
+                json.dump(self._log, log_file, indent=2)
+            self._compress_and_upload(int(job['pk']), "log", "json", [log], self.jobdir + "/log.zip")
+        except:
+            print("Failed to write log data to: %s" % log)
+            print(traceback.format_exc())
+
         if not self._debug:
             self._rmdir(self.jobdir)
         self._jobdir = None
@@ -422,22 +479,19 @@ class AbstractJobExecutor(object):
             self._pre_run(template, job)
             pre_run_success = True
         except:
-            print("Failed to execute pre-run code:")
-            print(traceback.format_exc())
+            self._log_msg("Failed to execute pre-run code:\n%s" % traceback.format_exc())
 
         if pre_run_success:
             try:
                 self._do_run(template, job)
                 do_run_success = True
             except:
-                print("Failed to execute do-run code:")
-                print(traceback.format_exc())
+                self._log_msg("Failed to execute do-run code:\n%s" % traceback.format_exc())
 
         try:
             self._post_run(template, job, pre_run_success, do_run_success)
         except:
-            print("Failed to execute post-run code:")
-            print(traceback.format_exc())
+            self._log_msg("Failed to execute post-run code:\n%s" % traceback.format_exc())
 
     def __str__(self):
         """
