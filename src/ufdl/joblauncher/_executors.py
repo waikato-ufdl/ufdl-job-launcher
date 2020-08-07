@@ -394,6 +394,27 @@ class AbstractJobExecutor(object):
 
         return result
 
+    def _expand_template(self, job, template):
+        """
+        Expands all parameters in the template code and returns the updated template string.
+
+        :param job: the job dictionary
+        :type job: dict
+        :param template: the template dictionary (for defaults)
+        :type template: dict
+        :return: the expanded template
+        :rtype: str
+        """
+
+        result = template["template"]
+
+        for param in job['parameters']:
+            name = param['name']
+            value = self._parameter(name, job, template)
+            result = result.replace("${" + name + "}", value)
+
+        return result
+
     def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strippath=True):
         """
         Compresses the files as zip file and uploads them as job output under the specified name.
