@@ -148,6 +148,19 @@ class AbstractJobExecutor(object):
             print("rmdir:", dir)
         shutil.rmtree(dir, ignore_errors=True)
 
+    def _execute_can_use_stdin(self, no_sudo=None):
+        """
+        Returns whether the _execute function can use stdin.
+        Not possible if sudo is asking for password.
+
+        :return: True if it can make use of stdin
+        """
+        if self.use_sudo:
+            if no_sudo is None or no_sudo is False:
+                if self.ask_sudo_pw:
+                    return False
+        return True
+
     def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=False, stdin=None):
         """
         Executes the command.
@@ -168,14 +181,15 @@ class AbstractJobExecutor(object):
         :rtype: subprocess.CompletedProcess
         """
 
+        if (stdin is not None) and (not self._execute_can_use_stdin(no_sudo)):
+            raise Exception("Cannot feed data into stdin of process! E.g., when sudo is asking for password.")
+
         full = []
         if self.use_sudo:
             if no_sudo is None or no_sudo is False:
                 full.append("sudo")
                 if self.ask_sudo_pw:
                     full.append("-S")
-                    if stdin is not None:
-                        raise Exception("Cannot feed into stdin if sudo is asking for password!")
         full.extend(cmd)
 
         if self.debug:
@@ -531,7 +545,10 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: None if successfully logged in, otherwise subprocess.CompletedProcess
         :rtype: subprocess.CompletedProcess
         """
-        return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password)
+        if self._execute_can_use_stdin(no_sudo=(not self.use_sudo)):
+            return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password)
+        else:
+            return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False)
 
     def _logout_registry(self, registry):
         """
