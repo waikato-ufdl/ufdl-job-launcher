@@ -149,8 +149,7 @@ class AbstractJobExecutor(object):
         :type data: object
         """
         entry = dict()
-        entry['timestamp'] = str(datetime.now())
-        entry['data'] = data
+        entry[str(datetime.now())] = data
         self._log.append(entry)
 
     def _log_msg(self, *args):
@@ -160,7 +159,9 @@ class AbstractJobExecutor(object):
         :param args: the arguments to log, get turned into a string, blank separated (similar to print)
         """
         str_args = [str(x) for x in args]
-        self._add_log(" ".join(str_args))
+        data = dict()
+        data['msg'] = " ".join(str_args).split("\n")
+        self._add_log(data)
 
     def _mktmpdir(self):
         """
@@ -251,9 +252,9 @@ class AbstractJobExecutor(object):
         log_data = dict()
         log_data['cmd'] = result.args
         if result.stdout is not None:
-            log_data['stdout'] = result.stdout.decode()
+            log_data['stdout'] = result.stdout.decode().split("\n")
         if result.stdout is not None:
-            log_data['stderr'] = result.stderr.decode()
+            log_data['stderr'] = result.stderr.decode().split("\n")
         log_data['returncode'] = result.returncode
         self._add_log(log_data)
 
