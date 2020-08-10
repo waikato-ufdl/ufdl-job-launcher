@@ -406,13 +406,30 @@ class AbstractJobExecutor(object):
         :return: the expanded template
         :rtype: str
         """
-
         result = template["template"]
 
         for param in job['parameters']:
             name = param['name']
             value = self._parameter(name, job, template)
             result = result.replace("${" + name + "}", value)
+
+        return result
+
+    def _any_present(self, files):
+        """
+        Checks whether at least one of the files listed is present in the file system.
+
+        :param files: the file names to check (absolute paths)
+        :type files: list
+        :return: True if at least one present
+        :rtype: bool
+        """
+        result = False
+
+        for f in files:
+            if os.path.exists(f) and os.path.isfile(f):
+                result = True
+                break
 
         return result
 
@@ -433,6 +450,14 @@ class AbstractJobExecutor(object):
         :param strippath: whether to strip the path from the files (None, True or path-prefix to remove)
         :type strippath: bool or str
         """
+        if len(files) == 0:
+            self._log_msg("No files supplied, cannot generate zip file %s:" % zipfile)
+            return
+
+        if not self._any_present(files):
+            self._log_msg("None of the files are present, cannot generate zip file %s:" % zipfile, files)
+            return
+
         self._compress(files, zipfile, strippath=strippath)
         # TODO upload to backend
 
