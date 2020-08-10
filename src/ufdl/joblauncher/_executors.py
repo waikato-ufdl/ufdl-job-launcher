@@ -432,11 +432,11 @@ class AbstractJobExecutor(object):
         :return: the expanded template
         :rtype: str
         """
-        result = template["template"]
+        result = "".join(template["template"])
 
         for param in job['parameters']:
             name = param['name']
-            value = self._parameter(name, job, template)
+            value = self._parameter(name, job, template)['value']
             result = result.replace("${" + name + "}", value)
 
         return result

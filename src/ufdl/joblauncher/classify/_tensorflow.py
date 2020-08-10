@@ -1,6 +1,9 @@
 from glob import glob
+import shlex
 from ufdl.joblauncher import AbstractDockerJobExecutor
 from ufdl.pythonclient.functional.image_classification.dataset import download as dataset_download
+
+KEY_GENERATE_STATS = 'generate-stats'
 
 
 class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
@@ -39,7 +42,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         data = self.job_dir + "/data.zip"
         pk = int(self._input("data", job, template)["value"])
         options = self._input("data", job, template)["options"]
-        self._log_msg("Downloading dataset:", pk, "-> options=", options, "->", data)
+        self._log_msg("Downloading dataset:", pk, "-> options='" + str(options) + "'", "->", data)
         with open(data, "wb") as zip_file:
             for b in dataset_download(self.context, pk, annotations_args=options):
                 zip_file.write(b)
@@ -75,26 +78,11 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         res = self._run_image(
             image,
             volumes=volumes,
-            image_args=[
-                "tfic-retrain",
-                "--image_dir", "/data",
-                "--image_lists_dir", "/output",
-                "--output_graph", "/output/graph.pb",
-                "--output_labels", "/output/labels.txt",
-                "--output_info", "/output/info.json",
-                "--checkpoint_path", "/output/retrain_checkpoint",
-                "--saved_model_dir", "/output/saved_model",
-                "--bottleneck_dir", "/output/bottleneck",
-                "--intermediate_output_graphs_dir", "/output/intermediate_graph",
-                "--summaries_dir", "/output/retrain_logs",
-                "--training_steps", self._parameter('steps', job, template)['value'],
-                "--tfhub_cache_dir", "/models",
-                "--tfhub_module", self._parameter('model', job, template)['value'],
-            ]
+            image_args=shlex.split(self._expand_template(job, template))
         )
 
         # stats?
-        if (res is None) and bool(self._parameter('generate-stats', job, template)['value']):
+        if (res is None) and bool(self._parameter(KEY_GENERATE_STATS, job, template)['value']):
             for t in ["training", "testing", "validation"]:
                 self._run_image(
                     image,
@@ -162,7 +150,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
             self.job_dir + "/image_lists.zip")
 
         # zip+upload predictions/stats
-        if do_run_success and bool(self._parameter('generate-stats', job, template)['value']):
+        if do_run_success and bool(self._parameter(KEY_GENERATE_STATS, job, template)['value']):
             self._compress_and_upload(
                 pk, "statistics", "csv",
                 glob(self.job_dir + "/output/*.csv"),

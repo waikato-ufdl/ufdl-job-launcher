@@ -8,4 +8,4 @@ with open("./job_template-train-objdet.template", "r") as tf:
     lines = tf.readlines()
 data = dict()
 data['template'] = "".join(lines)
-print(json.dumps(data))
+print(json.dumps(data, indent=2))
