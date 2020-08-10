@@ -8,7 +8,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
     For executing Tensorflow image classification jobs.
     """
 
-    def __init__(self, context, workdir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
+    def __init__(self, context, work_dir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
         """
         Initializes the executor with the backend context.
 
@@ -22,7 +22,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         :type ask_sudo_pw: bool
         """
         super(ImageClassificationTrain_TF_1_14, self).__init__(
-            context, workdir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw, use_current_user=use_current_user)
+            context, work_dir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw, use_current_user=use_current_user)
 
     def _pre_run(self, template, job):
         """
