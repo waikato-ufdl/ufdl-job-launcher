@@ -36,7 +36,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         super()._pre_run(template, job)
 
         # download dataset
-        data = self.jobdir + "/data.zip"
+        data = self.job_dir + "/data.zip"
         pk = int(self._input("data", job, template)["value"])
         options = self._input("data", job, template)["options"]
         self._log_msg("Downloading dataset:", pk, "-> options=", options, "->", data)
@@ -45,14 +45,14 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
                 zip_file.write(b)
 
         # decompress dataset
-        output_dir = self.jobdir + "/data"
+        output_dir = self.job_dir + "/data"
         msg = self._decompress(data, output_dir)
         if msg is not None:
             raise Exception("Failed to extract dataset pk=%d!\n%s" % (pk, msg))
 
         # create remaining directories
-        self._mkdir(self.jobdir + "/output")
-        self._mkdir(self.jobdir + "/models")
+        self._mkdir(self.job_dir + "/output")
+        self._mkdir(self.job_dir + "/models")
 
     def _do_run(self, template, job):
         """
@@ -66,9 +66,9 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
 
         image = self._docker_image['url']
         volumes=[
-            self.jobdir + "/data" + ":/data",
-            self.jobdir + "/output" + ":/output",
-            self.jobdir + "/models" + ":/models",
+            self.job_dir + "/data" + ":/data",
+            self.job_dir + "/output" + ":/output",
+            self.job_dir + "/models" + ":/models",
         ]
 
         # build model
@@ -132,40 +132,40 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
             self._compress_and_upload(
                 pk, "model", "tfmodel",
                 [
-                    self.jobdir + "/output/graph.pb",
-                    self.jobdir + "/output/labels.txt",
-                    self.jobdir + "/output/info.json"
+                    self.job_dir + "/output/graph.pb",
+                    self.job_dir + "/output/labels.txt",
+                    self.job_dir + "/output/info.json"
                 ],
-                self.jobdir + "/model.zip")
+                self.job_dir + "/model.zip")
 
         # zip+upload checkpoint (retrain_checkpoint.*)
         if do_run_success:
             self._compress_and_upload(
                 pk, "checkpoint", "tfcheckpoint",
-                glob(self.jobdir + "/output/retrain_checkpoint.*"),
-                self.jobdir + "/checkpoint.zip")
+                glob(self.job_dir + "/output/retrain_checkpoint.*"),
+                self.job_dir + "/checkpoint.zip")
 
         # zip+upload train/val tensorboard (retrain_logs)
         self._compress_and_upload(
             pk, "log_train", "tensorboard",
-            glob(self.jobdir + "/output/retrain_logs/train/events*"),
-            self.jobdir + "/tensorboard_train.zip")
+            glob(self.job_dir + "/output/retrain_logs/train/events*"),
+            self.job_dir + "/tensorboard_train.zip")
         self._compress_and_upload(
             pk, "log_validation", "tensorboard",
-            glob(self.jobdir + "/output/retrain_logs/validation/events*"),
-            self.jobdir + "/tensorboard_validation.zip")
+            glob(self.job_dir + "/output/retrain_logs/validation/events*"),
+            self.job_dir + "/tensorboard_validation.zip")
 
         # zip+upload train/test/val image list files (*.json)
         self._compress_and_upload(
             pk, "image_lists", "json",
-            glob(self.jobdir + "/output/*.json"),
-            self.jobdir + "/image_lists.zip")
+            glob(self.job_dir + "/output/*.json"),
+            self.job_dir + "/image_lists.zip")
 
         # zip+upload predictions/stats
         if do_run_success and bool(self._parameter('generate-stats', job, template)['value']):
             self._compress_and_upload(
                 pk, "statistics", "csv",
-                glob(self.jobdir + "/output/*.csv"),
-                self.jobdir + "/statistics.zip")
+                glob(self.job_dir + "/output/*.csv"),
+                self.job_dir + "/statistics.zip")
 
         super()._post_run(template, job, pre_run_success, do_run_success)

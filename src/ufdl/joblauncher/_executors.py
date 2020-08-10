@@ -7,7 +7,7 @@ import subprocess
 from subprocess import CompletedProcess
 import tempfile
 import traceback
-from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
+from zipfile import ZipFile, ZIP_STORED
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 
@@ -29,14 +29,14 @@ class AbstractJobExecutor(object):
     Ancestor for classes executing jobs.
     """
 
-    def __init__(self, context, workdir, use_sudo=False, ask_sudo_pw=False):
+    def __init__(self, context, work_dir, use_sudo=False, ask_sudo_pw=False):
         """
         Initializes the executor with the backend context.
 
         :param context: the server context
         :type context: UFDLServerContext
-        :param workdir: the working directory to use
-        :type workdir: str
+        :param work_dir: the working directory to use
+        :type work_dir: str
         :param use_sudo: whether to prefix commands with sudo
         :type use_sudo: bool
         :param ask_sudo_pw: whether to prompt user in console for sudo password
@@ -44,8 +44,8 @@ class AbstractJobExecutor(object):
         """
         self._debug = False
         self._context = context
-        self._workdir = workdir
-        self._jobdir = None
+        self._work_dir = work_dir
+        self._job_dir = None
         self._use_sudo = use_sudo
         self._ask_sudo_pw = ask_sudo_pw
         self._log = list()
@@ -102,24 +102,24 @@ class AbstractJobExecutor(object):
         return self._context
 
     @property
-    def workdir(self):
+    def work_dir(self):
         """
         Returns the working directory. Used for temp files and dirs.
 
         :return: the directory
         :rtype: str
         """
-        return self._workdir
+        return self._work_dir
 
     @property
-    def jobdir(self):
+    def job_dir(self):
         """
         Returns the working directory. Used for temp files and dirs.
 
         :return: the directory for the job (gets created before actual run and deleted afterwards again)
         :rtype: str
         """
-        return self._jobdir
+        return self._job_dir
 
     @property
     def use_sudo(self):
@@ -152,6 +152,30 @@ class AbstractJobExecutor(object):
         entry[str(datetime.now())] = data
         self._log.append(entry)
 
+    def _obscure(self, args, hide):
+        """
+        Obscures/masks the specified list of strings in the
+
+        :param args: the list of string arguments to process
+        :type args: list
+        :param hide: the list of strings to hide
+        :type hide: list
+        :return: the obscured list of strings
+        :rtype: list
+        """
+
+        if (hide is None) or (len(hide) == 0):
+            return args
+
+        result = []
+        to_hide = set(hide)
+        for arg in args:
+            if arg in to_hide:
+                result.append("*" * 3)
+            else:
+                result.append(arg)
+        return result
+
     def _log_msg(self, *args):
         """
         For logging debugging messages.
@@ -170,7 +194,7 @@ class AbstractJobExecutor(object):
         :return: the tmp directory that has been created
         :rtype: str
         """
-        return tempfile.mkdtemp(suffix="", prefix="", dir=self.workdir)
+        return tempfile.mkdtemp(suffix="", prefix="", dir=self.work_dir)
 
     def _mkdir(self, directory):
         """
@@ -205,7 +229,7 @@ class AbstractJobExecutor(object):
                     return False
         return True
 
-    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=True, stdin=None):
+    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=True, stdin=None, hide=None):
         """
         Executes the command.
 
@@ -220,6 +244,8 @@ class AbstractJobExecutor(object):
         :type capture_output: bool
         :param stdin: the text to feed into the process via stdin
         :type stdin: str
+        :param hide: the list of strings to obscure in the log message
+        :type hide: list
         :return: the CompletedProcess object from executing the command, uses 255 as return code in case of an
                  exception and stores the stack trace in stderr
         :rtype: subprocess.CompletedProcess
@@ -236,7 +262,7 @@ class AbstractJobExecutor(object):
                     full.append("-S")
         full.extend(cmd)
 
-        self._log_msg("Executing:", " ".join(full))
+        self._log_msg("Executing:", " ".join(self._obscure(full, hide)))
 
         try:
             if stdin is not None:
@@ -250,7 +276,7 @@ class AbstractJobExecutor(object):
             result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
 
         log_data = dict()
-        log_data['cmd'] = result.args
+        log_data['cmd'] = self._obscure(result.args, hide)
         if result.stdout is not None:
             log_data['stdout'] = result.stdout.decode().split("\n")
         if result.stdout is not None:
@@ -263,7 +289,7 @@ class AbstractJobExecutor(object):
         else:
             return None
         
-    def _compress(self, files, zipfile, strippath=None):
+    def _compress(self, files, zipfile, strip_path=None):
         """
         Compresses the files and stores them in the zip file.
         
@@ -271,8 +297,8 @@ class AbstractJobExecutor(object):
         :type files: list  
         :param zipfile: the zip file to create
         :type zipfile: str
-        :param strippath: whether to strip the path: True for removing completely, or prefix string to remove
-        :type strippath: bool or str
+        :param strip_path: whether to strip the path: True for removing completely, or prefix string to remove
+        :type strip_path: bool or str
         :return: None if successful, otherwise error message
         :rtype: str
         """
@@ -283,11 +309,11 @@ class AbstractJobExecutor(object):
             with ZipFile(zipfile, "w", compression=self._compression) as zf:
                 for f in files:
                     arcname = None
-                    if strippath is not None:
-                        if isinstance(strippath, bool):
+                    if strip_path is not None:
+                        if isinstance(strip_path, bool):
                             arcname = os.path.basename(f)
-                        elif f.startswith(strippath):
-                            arcname = f[len(strippath):]
+                        elif f.startswith(strip_path):
+                            arcname = f[len(strip_path):]
                         if arcname.startswith("/"):
                             arcname = arcname[1:]
                     zf.write(f, arcname=arcname)
@@ -433,7 +459,7 @@ class AbstractJobExecutor(object):
 
         return result
 
-    def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strippath=True):
+    def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strip_path=True):
         """
         Compresses the files as zip file and uploads them as job output under the specified name.
 
@@ -447,8 +473,8 @@ class AbstractJobExecutor(object):
         :type files: list
         :param zipfile: the zip file to store the files in
         :type zipfile: str
-        :param strippath: whether to strip the path from the files (None, True or path-prefix to remove)
-        :type strippath: bool or str
+        :param strip_path: whether to strip the path from the files (None, True or path-prefix to remove)
+        :type strip_path: bool or str
         """
         if len(files) == 0:
             self._log_msg("No files supplied, cannot generate zip file %s:" % zipfile)
@@ -458,7 +484,7 @@ class AbstractJobExecutor(object):
             self._log_msg("None of the files are present, cannot generate zip file %s:" % zipfile, files)
             return
 
-        self._compress(files, zipfile, strippath=strippath)
+        self._compress(files, zipfile, strip_path=strip_path)
         # TODO upload to backend
 
     def _pre_run(self, template, job):
@@ -470,8 +496,8 @@ class AbstractJobExecutor(object):
         :param job: the job with the actual values for inputs and parameters
         :type job: dict
         """
-        self._jobdir = self._mktmpdir()
-        self._log_msg("Created jobdir:", self.jobdir)
+        self._job_dir = self._mktmpdir()
+        self._log_msg("Created jobdir:", self.job_dir)
 
     def _do_run(self, template, job):
         """
@@ -497,18 +523,18 @@ class AbstractJobExecutor(object):
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
         :type do_run_success: bool
         """
-        log = self.jobdir + "/log.json"
+        log = self.job_dir + "/log.json"
         try:
-            with open(self.jobdir + "/log.json", "w") as log_file:
+            with open(self.job_dir + "/log.json", "w") as log_file:
                 json.dump(self._log, log_file, indent=2)
-            self._compress_and_upload(int(job['pk']), "log", "json", [log], self.jobdir + "/log.zip")
+            self._compress_and_upload(int(job['pk']), "log", "json", [log], self.job_dir + "/log.zip")
         except:
             print("Failed to write log data to: %s" % log)
             print(traceback.format_exc())
 
         if not self._debug:
-            self._rmdir(self.jobdir)
-        self._jobdir = None
+            self._rmdir(self.job_dir)
+        self._job_dir = None
 
     def run(self, template, job):
         """
@@ -547,7 +573,7 @@ class AbstractJobExecutor(object):
         :return: the short description
         :rtype: str
         """
-        return "context=" + str(self.context) + ", workdir=" + self.workdir
+        return "context=" + str(self.context) + ", workdir=" + self.work_dir
 
 
 class AbstractDockerJobExecutor(AbstractJobExecutor):
@@ -555,14 +581,14 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
     For executing jobs via docker images.
     """
 
-    def __init__(self, context, workdir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
+    def __init__(self, context, work_dir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
         """
         Initializes the executor with the backend context.
 
         :param context: the server context
         :type context: UFDLServerContext
-        :param workdir: the working directory to use
-        :type workdir: str
+        :param work_dir: the working directory to use
+        :type work_dir: str
         :param use_sudo: whether to prefix commands with sudo
         :type use_sudo: bool
         :param ask_sudo_pw: whether to prompt user in console for sudo password
@@ -571,7 +597,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type use_current_user: bool
         """
         super(AbstractDockerJobExecutor, self).__init__(
-            context, workdir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw)
+            context, work_dir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw)
         self._use_current_user = use_current_user
         self._use_gpu = False
         self._docker_image = None
@@ -647,9 +673,9 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :rtype: subprocess.CompletedProcess
         """
         if self._execute_can_use_stdin(no_sudo=(not self.use_sudo)):
-            return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password)
+            return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password, hide=[user])
         else:
-            return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False)
+            return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False, hide=[user, password])
 
     def _logout_registry(self, registry):
         """

@@ -36,11 +36,11 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
         super()._pre_run(template, job)
 
         # create directories
-        self._mkdir(self.jobdir + "/output")
-        self._mkdir(self.jobdir + "/models")
+        self._mkdir(self.job_dir + "/output")
+        self._mkdir(self.job_dir + "/models")
 
         # download dataset
-        data = self.jobdir + "/data.zip"
+        data = self.job_dir + "/data.zip"
         pk = int(self._input("data", job, template)["value"])
         options = self._input("data", job, template)["options"]
         self._log_msg("Downloading dataset:", pk, "-> options=", options, "->", data)
@@ -49,14 +49,14 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
                 zip_file.write(b)
 
         # decompress dataset
-        output_dir = self.jobdir + "/data"
+        output_dir = self.job_dir + "/data"
         msg = self._decompress(data, output_dir)
         if msg is not None:
             raise Exception("Failed to extract dataset pk=%d!\n%s" % (pk, msg))
 
         # replace parameters in template and save it to disk
         template_code = self._expand_template(job, template)
-        template_file = self.jobdir + "/output/config.py"
+        template_file = self.job_dir + "/output/config.py"
         with open(template_file, "w") as tf:
             tf.write(template_code)
 
@@ -72,9 +72,9 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
 
         image = self._docker_image['url']
         volumes=[
-            self.jobdir + "/data" + ":/data",
-            self.jobdir + "/output" + ":/output",
-            self.jobdir + "/models" + ":/models",
+            self.job_dir + "/data" + ":/data",
+            self.job_dir + "/output" + ":/output",
+            self.job_dir + "/models" + ":/models",
         ]
 
         # build model
@@ -113,16 +113,16 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
         self._compress_and_upload(
             pk, "model", "mmdetmodel",
             [
-                self.jobdir + "/output/latest.pth",
-                self.jobdir + "/output/config.py",
-                self.jobdir + "/data/labels.txt"
+                self.job_dir + "/output/latest.pth",
+                self.job_dir + "/output/config.py",
+                self.job_dir + "/data/labels.txt"
             ],
-            self.jobdir + "/model.zip")
+            self.job_dir + "/model.zip")
 
         # zip+upload training logs
         self._compress_and_upload(
             pk, "log", "json",
-            glob(self.jobdir + "/output/*.log.json"),
-            self.jobdir + "/log.zip")
+            glob(self.job_dir + "/output/*.log.json"),
+            self.job_dir + "/log.zip")
 
         super()._post_run(template, job, pre_run_success, do_run_success)
