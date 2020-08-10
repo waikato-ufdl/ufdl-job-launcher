@@ -1,7 +1,7 @@
 {
   "pk": 1,
   "template": 1,
-  "docker_image": 6,
+  "docker_image": 3,
   "inputs":
   [
     {
