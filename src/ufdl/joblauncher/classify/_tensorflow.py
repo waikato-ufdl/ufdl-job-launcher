@@ -72,7 +72,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         ]
 
         # build model
-        self._run_image(
+        res = self._run_image(
             image,
             volumes=volumes,
             image_args=[
@@ -94,7 +94,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         )
 
         # stats?
-        if bool(self._parameter('generate-stats', job, template)['value']):
+        if (res is None) and bool(self._parameter('generate-stats', job, template)['value']):
             for t in ["training", "testing", "validation"]:
                 self._run_image(
                     image,
@@ -128,20 +128,22 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         pk = int(job['pk'])
 
         # zip+upload model (output_graph.pb and output_labels.txt)
-        self._compress_and_upload(
-            pk, "model", "tfmodel",
-            [
-                self.jobdir + "/output/graph.pb",
-                self.jobdir + "/output/labels.txt",
-                self.jobdir + "/output/info.json"
-            ],
-            self.jobdir + "/model.zip")
+        if do_run_success:
+            self._compress_and_upload(
+                pk, "model", "tfmodel",
+                [
+                    self.jobdir + "/output/graph.pb",
+                    self.jobdir + "/output/labels.txt",
+                    self.jobdir + "/output/info.json"
+                ],
+                self.jobdir + "/model.zip")
 
         # zip+upload checkpoint (retrain_checkpoint.*)
-        self._compress_and_upload(
-            pk, "checkpoint", "tfcheckpoint",
-            glob(self.jobdir + "/output/retrain_checkpoint.*"),
-            self.jobdir + "/checkpoint.zip")
+        if do_run_success:
+            self._compress_and_upload(
+                pk, "checkpoint", "tfcheckpoint",
+                glob(self.jobdir + "/output/retrain_checkpoint.*"),
+                self.jobdir + "/checkpoint.zip")
 
         # zip+upload train/val tensorboard (retrain_logs)
         self._compress_and_upload(
@@ -160,7 +162,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
             self.jobdir + "/image_lists.zip")
 
         # zip+upload predictions/stats
-        if bool(self._parameter('generate-stats', job, template)['value']):
+        if do_run_success and bool(self._parameter('generate-stats', job, template)['value']):
             self._compress_and_upload(
                 pk, "statistics", "csv",
                 glob(self.jobdir + "/output/*.csv"),
