@@ -432,7 +432,7 @@ class AbstractJobExecutor(object):
         :return: the expanded template
         :rtype: str
         """
-        result = "".join(template["template"])
+        result = "".join(template["body"])
 
         for param in job['parameters']:
             name = param['name']
