@@ -3,6 +3,7 @@ import math
 import psutil
 import subprocess
 from wai.lazypip import require_class
+from ufdl.pythonclient.functional.core.nodes.hardware import list as list_hardware
 
 
 def load_executor_class(class_name, required_packages):
@@ -56,36 +57,31 @@ def to_bytes(s):
     return int(s) * factor
 
 
-def to_hardware_generation(compute):
+def to_hardware_generation(context, compute):
     """
     Turns the compute number into a hardware generation string
 
+    :param context: the server context
+    :type context: ufdl.pythonclient.UFDLServerContext
     :param compute: the compute number
     :type compute: float
     :return: the hardware generation
     :rtype: str
     """
-    if compute == 8.0:
-        return "Ampere"
-    elif compute == 7.5:
-        return "Turing"
-    elif math.floor(compute) == 7.0:
-        return "Volta"
-    elif math.floor(compute) == 6.0:
-        return "Volta"
-    elif math.floor(compute) == 5.0:
-        return "Pascal"
-    elif math.floor(compute) == 4.0:
-        return "Maxwell"
-    elif math.floor(compute) == 3.0:
-        return "Kepler"
-    elif math.floor(compute) == 2.0:
-        return "Fermi"
+
+    match = None
+    for hw in list_hardware(context):
+        if (compute >= hw['min_compute_capability']) and (compute < hw['max_compute_capability']):
+            match = hw
+            break
+
+    if match is not None:
+        return match['generation']
     else:
         raise Exception("Unhandled compute version: " + str(compute))
 
 
-def hardware_info():
+def hardware_info(context):
     """
     Collects hardware information with the following keys (memory is in bytes):
     - memory
@@ -104,6 +100,8 @@ def hardware_info():
           - used
           - free
 
+    :param context: the server context
+    :type context: ufdl.pythonclient.UFDLServerContext
     :return: the hardware info
     :rtype: dict
     """
@@ -145,7 +143,7 @@ def hardware_info():
                         gpus[major + "." + minor] = dict()
                 elif "Architecture" in line:
                     gpus[major + "." + minor]['compute'] = float(parts[1])
-                    gpus[major + "." + minor]['generation'] = to_hardware_generation(float(parts[1]))
+                    gpus[major + "." + minor]['generation'] = to_hardware_generation(context, float(parts[1]))
                 elif "Model" in line:
                     gpus[major + "." + minor]['model'] = parts[1]
                 elif "Brand" in line:
