@@ -3,7 +3,7 @@
   "version": 1,
   "scope": "public",
   "domain": "od",
-  "task": "train",
+  "tasks": ["train"],
   "executor_class": "ufdl.joblauncher.objdet.ObjectDetectionTrain_MMDet_1_2",
   "required_packages": "",
   "inputs":

@@ -3,7 +3,7 @@
   "version": 1,
   "scope": "public",
   "domain": "ic",
-  "task": "train",
+  "tasks": ["train"],
   "executor_class": "ufdl.joblauncher.classify.ImageClassificationTrain_TF_1_14",
   "required_packages": "",
   "inputs":
