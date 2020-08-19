@@ -495,6 +495,7 @@ class AbstractJobExecutor(object):
         """
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
+        # TODO flag job as started by filling in the start_time field with the current timestamp
 
     def _do_run(self, template, job):
         """
@@ -532,6 +533,7 @@ class AbstractJobExecutor(object):
         if not self._debug:
             self._rmdir(self.job_dir)
         self._job_dir = None
+        # TODO flag job as finished by filling in the end_time field with the current timestamp
 
     def run(self, template, job):
         """
