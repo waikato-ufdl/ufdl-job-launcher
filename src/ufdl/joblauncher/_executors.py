@@ -362,10 +362,8 @@ class AbstractJobExecutor(object):
         if default is None:
             raise Exception("Input '%s' not found in template!\n%s" % (name, str(template)))
         supplied = None
-        for _input in job['inputs']:
-            if _input['name'] == name:
-                supplied = _input
-                break
+        if name in job['input_values']:
+            supplied = job['input_values'][name]
 
         result = dict()
         result['name'] = name
@@ -375,11 +373,8 @@ class AbstractJobExecutor(object):
             if 'options' in default:
                 result['options'] = default['options']
         else:
-            result['value'] = supplied['value']
-            if 'options' in supplied:
-                result['options'] = supplied['options']
-            else:
-                result['options'] = default['options']
+            result['value'] = supplied
+            result['options'] = default['options']
         if 'options' not in result:
             result['options'] = ''
 
@@ -406,10 +401,8 @@ class AbstractJobExecutor(object):
         if default is None:
             raise Exception("Parameter '%s' not found in template!\n%s" % (name, str(template)))
         supplied = None
-        for param in job['parameters']:
-            if param['name'] == name:
-                supplied = param
-                break
+        if name in job['parameter_values']:
+            supplied = job['parameter_values'][name]
 
         result = dict()
         result['name'] = name
@@ -417,7 +410,7 @@ class AbstractJobExecutor(object):
         if supplied is None:
             result['value'] = default['default']
         else:
-            result['value'] = supplied['value']
+            result['value'] = supplied
 
         return result
 
@@ -434,8 +427,7 @@ class AbstractJobExecutor(object):
         """
         result = "".join(template["body"])
 
-        for param in job['parameters']:
-            name = param['name']
+        for name in job['parameter_values']:
             value = self._parameter(name, job, template)['value']
             result = result.replace("${" + name + "}", value)
 
@@ -746,7 +738,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         # docker image
         if KEY_DOCKER_IMAGE not in job:
             raise Exception("Docker image PK not defined in job (key: %s)!\n%s" % (KEY_DOCKER_IMAGE, str(job)))
-        self._docker_image = docker_retrieve(self.context, int(job[KEY_DOCKER_IMAGE]))
+        self._docker_image = docker_retrieve(self.context, int(job[KEY_DOCKER_IMAGE]['pk']))
         self._login_registry(
             self._docker_image[KEY_REGISTRY_URL],
             self._docker_image[KEY_REGISTRY_USERNAME],
