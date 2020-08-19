@@ -10,6 +10,7 @@ import traceback
 from zipfile import ZipFile, ZIP_STORED
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
+from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
 
 KEY_CPU = 'cpu'
 
@@ -477,7 +478,11 @@ class AbstractJobExecutor(object):
             return
 
         self._compress(files, zipfile, strip_path=strip_path)
-        # TODO upload to backend
+        try:
+            with open(zipfile, "rb") as zf:
+                job_add_output(self.context, job_pk, output_name, output_type, zf)
+        except:
+            self._log_msg("Failed to upload zipfile (%s/%s/%s) to backend:\n%s" % (output_name, output_type, zipfile, traceback.format_exc()))
 
     def _pre_run(self, template, job):
         """
