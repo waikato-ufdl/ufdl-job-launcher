@@ -88,6 +88,8 @@ def hardware_info(context):
       - total
       - used
       - free
+    - driver (NVIDIA driver version, if available)
+    - cuda (CUDA version, if available)
     - gpus (if available)
       - device ID (major.minor)
         - model (GeForce RTX 2080 Ti)
