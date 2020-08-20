@@ -1,9 +1,27 @@
+import configparser
 import importlib
-import math
-import psutil
-import subprocess
+import traceback
 from wai.lazypip import require_class
-from ufdl.pythonclient.functional.core.nodes.hardware import list as list_hardware
+from ufdl.pythonclient import UFDLServerContext
+from ._node import hardware_info
+from ._logging import logger
+from ufdl.joblauncher.poll import simple_poll, rabbitmq_poll
+from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
+
+
+def create_server_context(config):
+    """
+    Creates the config from the configuration.
+
+    :param config: the configuration to use
+    :type config: configparser.ConfigParser
+    :return: the server context
+    :rtype: UFDLServerContext
+    """
+    return UFDLServerContext(
+        config['backend']['url'],
+        config['backend']['user'],
+        config['backend']['password'])
 
 
 def load_executor_class(class_name, required_packages):
@@ -18,7 +36,6 @@ def load_executor_class(class_name, required_packages):
     :return: the class object
     :rtype: class
     """
-
     module_name = ".".join(class_name.split(".")[0:-1])
     cls_name = class_name.split(".")[-1]
 
@@ -32,176 +49,75 @@ def load_executor_class(class_name, required_packages):
     return cls
 
 
-def to_bytes(s):
+def execute_job(context, config, job, debug=False):
     """
-    Turns the string with suffix of KiB/MiB/GiB into bytes.
+    Executes the given job.
 
-    :param s: the string (NUM SUFFIX)
-    :type s: str
-    :return: the number of bytes
-    :rtype: int
+    :param context: the UFDL server context
+    :type context: UFDLServerContext
+    :param config: the configuration to use
+    :type config: configparser.ConfigParser
+    :param job: the job to execute
+    :type job: dict
+    :param debug: whether to output debugging information
+    :type debug: bool
+    :return:
     """
-    factor = 1
-    if s.endswith(" KiB"):
-        factor = 1024
-        s = s[:-4].strip()
-    elif s.endswith(" MiB"):
-        factor = 1024 * 1024
-        s = s[:-4].strip()
-    elif s.endswith(" GiB"):
-        factor = 1024 * 1024 * 1024
-        s = s[:-4].strip()
-    elif s.endswith(" TiB"):
-        factor = 1024 * 1024 * 1024 * 1024
-        s = s[:-4].strip()
-    return int(s) * factor
+    if debug:
+        logger().debug("Job: %s" % str(job))
+    template = jobtemplate_retrieve(context, job['template']['pk'])
+
+    cls = load_executor_class(template["executor_class"], template["required_packages"])
+    executor = cls(
+        context,
+        config['docker']['work_dir'],
+        use_sudo=config['docker']['use_sudo'],
+        ask_sudo_pw=config['docker']['ask_sudo_pw'],
+        use_current_user=bool(config['docker']['use_current_user'])
+    )
+    executor.debug = bool(config['general']['debug'])
+    executor.compression = int(config['general']['compression'])
+    executor.run(template, job)
 
 
-def to_hardware_generation(context, compute):
+def launch_jobs(config, continuous, debug=False):
     """
-    Turns the compute number into a hardware generation string
+    Launches the jobs.
 
-    :param context: the server context
-    :type context: ufdl.pythonclient.UFDLServerContext
-    :param compute: the compute number
-    :type compute: float
-    :return: the hardware generation
-    :rtype: str
+    :param config: the configuration to use
+    :type config: configparser.ConfigParser
+    :param continuous: whether to poll continuously or only once
+    :type continuous: bool
+    :param debug: whether to output debugging information
+    :type debug: bool
     """
+    context = create_server_context(config)
+    info = hardware_info(context)
+    if debug:
+        logger().debug("hardware info: %s" % str(info))
+    poll = config['general']['poll']
+    if debug:
+        logger().debug("poll method: %s" % poll)
 
-    match = None
-    for hw in list_hardware(context):
-        if (compute >= hw['min_compute_capability']) and (compute < hw['max_compute_capability']):
-            match = hw
+    # TODO register node with backend
+
+    while True:
+        try:
+            job = None
+            if poll == "simple":
+                job = simple_poll(context, config, info, debug=debug)
+            elif poll == "rabbitmq":
+                job = rabbitmq_poll(context, config, info, debug=debug)
+            else:
+                logger().fatal("Unknown poll method: %s" % poll)
+                exit(1)
+            if job is not None:
+                execute_job(context, config, job, debug=debug)
+        except:
+            logger().error(traceback.format_exc())
+
+        # continue polling?
+        if not continuous:
             break
 
-    if match is not None:
-        return match['generation']
-    else:
-        raise Exception("Unhandled compute version: " + str(compute))
-
-
-def hardware_info(context):
-    """
-    Collects hardware information with the following keys (memory is in bytes):
-    - memory
-      - total
-      - used
-      - free
-    - driver (NVIDIA driver version, if available)
-    - cuda (CUDA version, if available)
-    - gpus (if available)
-      - device ID (major.minor)
-        - model (GeForce RTX 2080 Ti)
-        - brand (GeForce)
-        - uuid (GPU-AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE)
-        - bus (00000000:01:00.0)
-        - compute (7.5)
-        - memory
-          - total
-          - used
-          - free
-
-    :param context: the server context
-    :type context: ufdl.pythonclient.UFDLServerContext
-    :return: the hardware info
-    :rtype: dict
-    """
-    hardware = dict()
-    gpus = dict()
-    has_gpu = False
-
-    # ram
-    try:
-        mem = psutil.virtual_memory()
-        hardware['memory'] = dict()
-        hardware['memory']['total'] = mem.total
-        hardware['memory']['used'] = mem.used
-        hardware['memory']['free'] = mem.free
-    except:
-        pass
-
-    # gpu
-    try:
-        res = subprocess.run(["nvidia-container-cli", "info"], stdout=subprocess.PIPE)
-        has_gpu = True
-        lines = res.stdout.decode().split("\n")
-        major = ""
-        minor = ""
-        for line in lines:
-            if ":" in line:
-                parts = line.split(":")
-                for i in range(len(parts)):
-                    parts[i] = parts[i].strip()
-                if "NVRM version" in line:
-                    hardware['driver'] = parts[1]
-                elif "CUDA version" in line:
-                    hardware['cuda'] = parts[1]
-                elif "Device Index" in line:
-                    major = parts[1]
-                elif "Device Minor" in line:
-                    minor = parts[1]
-                    if not major + "." + minor in gpus:
-                        gpus[major + "." + minor] = dict()
-                elif "Architecture" in line:
-                    gpus[major + "." + minor]['compute'] = float(parts[1])
-                    gpus[major + "." + minor]['generation'] = to_hardware_generation(context, float(parts[1]))
-                elif "Model" in line:
-                    gpus[major + "." + minor]['model'] = parts[1]
-                elif "Brand" in line:
-                    gpus[major + "." + minor]['brand'] = parts[1]
-                elif "GPU UUID" in line:
-                    gpus[major + "." + minor]['uuid'] = parts[1]
-                elif "Bus Location" in line:
-                    gpus[major + "." + minor]['bus'] = ":".join(parts[1:])
-    except:
-        pass
-
-    # gpu memory
-    try:
-        res = subprocess.run(["nvidia-smi", "-q", "-d", "MEMORY"], stdout=subprocess.PIPE)
-        has_gpu = True
-        lines = res.stdout.decode().split("\n")
-        bus = ""
-        fb = False
-        for line in lines:
-            if line.startswith("GPU "):
-                bus = line[4:].strip()
-                continue
-            elif "FB Memory Usage" in line:
-                fb = True
-                continue
-            elif "BAR1 Memory Usage" in line:
-                fb = False
-                continue
-            if not fb:
-                continue
-            if ":" in line:
-                parts = line.split(":")
-                for i in range(len(parts)):
-                    parts[i] = parts[i].strip()
-                key = ""
-                val = ""
-                if "Total" in line:
-                    key = "total"
-                    val = parts[1]
-                elif "Used" in line:
-                    key = "used"
-                    val = parts[1]
-                elif "Free" in line:
-                    key = "free"
-                    val = parts[1]
-                if key != "":
-                    for gpu in hardware['gpus'].values():
-                        if gpu['bus'] == bus:
-                            if not 'memory' in gpu:
-                                gpu['memory'] = dict()
-                            gpu['memory'][key] = to_bytes(val)
-                            break
-    except:
-        pass
-
-    if has_gpu:
-        hardware['gpus'] = gpus
-
-    return hardware
+    # TODO de-register node

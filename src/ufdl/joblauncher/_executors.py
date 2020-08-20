@@ -8,9 +8,11 @@ from subprocess import CompletedProcess
 import tempfile
 import traceback
 from zipfile import ZipFile, ZIP_STORED
+from ._logging import logger
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
+from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job
 
 KEY_CPU = 'cpu'
 
@@ -495,7 +497,15 @@ class AbstractJobExecutor(object):
         """
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
-        # TODO flag job as started by filling in the start_time field with the current timestamp
+        # TODO reenable
+        # try:
+        #     acquire_job(self.context, job['pk'])
+        # except:
+        #     self._log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
+        # try:
+        #     start_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+        # except:
+        #     self._log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
     def _do_run(self, template, job):
         """
@@ -527,13 +537,17 @@ class AbstractJobExecutor(object):
                 json.dump(self._log, log_file, indent=2)
             self._compress_and_upload(int(job['pk']), "log", "json", [log], self.job_dir + "/log.zip")
         except:
-            print("Failed to write log data to: %s" % log)
-            print(traceback.format_exc())
+            logger().error("Failed to write log data to: %s" % log)
+            logger().error(traceback.format_exc())
 
         if not self._debug:
             self._rmdir(self.job_dir)
         self._job_dir = None
-        # TODO flag job as finished by filling in the end_time field with the current timestamp
+        # TODO reenable
+        # try:
+        #     finish_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+        # except:
+        #     self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
     def run(self, template, job):
         """

@@ -13,7 +13,7 @@ def _read(f) -> bytes:
 
 setup(
     name="ufdl.joblauncher",
-    description="Launches job as part of the UFDL framework.",
+    description="Launches jobs of the UFDL framework.",
     long_description=(
         _read('DESCRIPTION.rst') + b'\n' +
         _read('CHANGES.rst')).decode('utf-8'),
@@ -45,4 +45,9 @@ setup(
         "tensorflow",
         "psutil",
     ],
+    entry_points={
+        "console_scripts": [
+            "ufdl-joblauncher=ufdl.joblauncher.run:sys_main",
+        ]
+    }
 )
