@@ -113,9 +113,9 @@ def hardware_info(context):
                 elif "CUDA version" in line:
                     hardware['cuda'] = parts[1]
                 elif "Device Index" in line:
-                    index = parts[1]
+                    index = int(parts[1])
                 elif "Device Minor" in line:
-                    minor = parts[1]
+                    minor = int(parts[1])
                     if not index in gpus:
                         gpus[index] = dict()
                 elif "Architecture" in line:
