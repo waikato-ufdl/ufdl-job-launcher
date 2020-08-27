@@ -1,12 +1,17 @@
 import configparser
 import importlib
-import traceback
 from wai.lazypip import require_class
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
 from ._logging import logger
+from ufdl.joblauncher import get_ipv4
 from ufdl.joblauncher.poll import simple_poll, rabbitmq_poll
 from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
+import ufdl.pythonclient.functional.core.nodes.node as node
+from ufdl.json.core.filter import FilterSpec
+from ufdl.json.core.filter.field import Exact
+from ufdl.json.core.filter.logical import And
+from wai.json.object import Absent
 
 
 def create_server_context(config):
@@ -71,6 +76,7 @@ def execute_job(context, config, job, debug=False):
     executor = cls(
         context,
         config['docker']['work_dir'],
+        config['docker']['cache_dir'],
         use_sudo=config['docker']['use_sudo'],
         ask_sudo_pw=config['docker']['ask_sudo_pw'],
         use_current_user=bool(config['docker']['use_current_user'])
@@ -78,6 +84,80 @@ def execute_job(context, config, job, debug=False):
     executor.debug = bool(config['general']['debug'])
     executor.compression = int(config['general']['compression'])
     executor.run(template, job)
+
+
+def register_node(context, config, info):
+    """
+    Registers the node with the backend.
+
+    :param context: the UFDL server context
+    :type context: UFDLServerContext
+    :param config: the configuration to use
+    :type config: configparser.ConfigParser
+    :param info: the hardware information, see hardware_info method
+    :type info: dict
+    """
+    ip = get_ipv4()
+    node_id = int(config['general']['node_id'])
+    context.set_node_id(node_id)
+    driver = Absent
+    generation = Absent
+    gpu_mem = Absent
+    cpu_mem = Absent
+    if 'memory' in info:
+        cpu_mem = int(info['memory']['total'])
+    if 'driver' in info:
+        driver = info['driver']
+    if ('gpus' in info) and (node_id in info['gpus']):
+        if 'generation' in info['gpus'][str(node_id)]:
+            generation = int(info['gpus'][str(node_id)]['generation']['pk'])
+        if 'generation' in info['gpus'][str(node_id)]:
+            gpu_mem = int(info['gpus'][str(node_id)]['memory']['total'])
+
+    try:
+        f = FilterSpec(
+            expressions=[
+                    And(
+                        sub_expressions=[
+                            Exact(field="ip", value=ip),
+                            Exact(field="index", value=node_id)
+                        ]
+                    ),
+            ],
+            include_inactive=False
+        )
+        nodes = node.list(context, filter_spec=f)
+
+        # already stored?
+        if len(nodes) > 0:
+            pk = int(nodes[0]['pk'])
+            node.partial_update(context, pk, ip=ip, index=node_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
+        else:
+            obj = node.create(context, ip=ip, index=node_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
+            pk = int(obj['pk'])
+
+        # store pk of node for deregistering
+        config['general']['node_pk'] = pk
+    except:
+        logger().error("Failed to register node!", exc_info=1)
+
+
+def deregister_node(context, config):
+    """
+    Deregisters the node with the backend.
+
+    :param context: the UFDL server context
+    :type context: UFDLServerContext
+    :param config: the configuration to use
+    :type config: configparser.ConfigParser
+    """
+    if 'node_pk' in config['general']:
+        try:
+            node.destroy(context, pk=int(config['general']['node_pk']))
+        except:
+            logger().error("Failed to deregister node!", exc_info=1)
+    else:
+        logger().warning("No node pk stored in config, cannot deregister!")
 
 
 def launch_jobs(config, continuous, debug=False):
@@ -99,7 +179,8 @@ def launch_jobs(config, continuous, debug=False):
     if debug:
         logger().debug("poll method: %s" % poll)
 
-    # TODO register node with backend
+    # register node with backend
+    register_node(context, config, info)
 
     while True:
         try:
@@ -114,10 +195,11 @@ def launch_jobs(config, continuous, debug=False):
             if job is not None:
                 execute_job(context, config, job, debug=debug)
         except:
-            logger().error(traceback.format_exc())
+            logger().error("Failed to poll/execute job!", exc_info=1)
 
         # continue polling?
         if not continuous:
             break
 
-    # TODO de-register node
+    # de-register node
+    deregister_node(context, config)

@@ -115,3 +115,4 @@ echo "Installing dependencies..."
 ./venv/bin/pip install wai.annotations
 ./venv/bin/pip install pika
 ./venv/bin/pip install psutil
+./venv/bin/pip install pyyaml

@@ -39,9 +39,9 @@ def load_config(config_file=None):
 
     config = configparser.ConfigParser()
     config.read(config_file)
-    _check_section(config_file, config, "general", ["debug", "compression"])
+    _check_section(config_file, config, "general", ["debug", "compression", "poll", "node_id"])
     _check_section(config_file, config, "backend", ["url", "user", "password"])
-    _check_section(config_file, config, "docker", ["work_dir", "use_current_user"])
-    _check_section(config_file, config, "simple_poll", ["interval"])
-    _check_section(config_file, config, "rabbitmq_poll", ["host", "port", "queue"])
+    _check_section(config_file, config, "docker", ["work_dir", "cache_dir", "use_current_user"])
+    _check_section(config_file, config, "poll_simple", ["interval"])
+    _check_section(config_file, config, "poll_rabbitmq", ["host", "port", "queue"])
     return config

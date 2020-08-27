@@ -44,10 +44,12 @@ setup(
         "pika",
         "tensorflow",
         "psutil",
+        "pyyaml",
     ],
     entry_points={
         "console_scripts": [
             "ufdl-joblauncher=ufdl.joblauncher.run:sys_main",
+            "ufdl-hwinfo=ufdl.joblauncher.hardwareinfo:sys_main",
         ]
     }
 )

@@ -1,4 +1,5 @@
 import psutil
+import socket
 import subprocess
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.hardware import list as list_hardware
@@ -37,8 +38,8 @@ def to_hardware_generation(context, compute):
     :type context: UFDLServerContext
     :param compute: the compute number
     :type compute: float
-    :return: the hardware generation
-    :rtype: str
+    :return: the hardware generation (pk, name)
+    :rtype: dict
     """
     match = None
     for hw in list_hardware(context):
@@ -47,7 +48,7 @@ def to_hardware_generation(context, compute):
             break
 
     if match is not None:
-        return match['generation']
+        return {'pk': match['pk'], 'name': match['generation']}
     else:
         raise Exception("Unhandled compute version: " + str(compute))
 
@@ -62,12 +63,15 @@ def hardware_info(context):
     - driver (NVIDIA driver version, if available)
     - cuda (CUDA version, if available)
     - gpus (if available)
-      - device ID (major.minor)
+      - device ID (index)
         - model (GeForce RTX 2080 Ti)
         - brand (GeForce)
         - uuid (GPU-AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE)
         - bus (00000000:01:00.0)
         - compute (7.5)
+        - generation:
+          - pk
+          - name
         - memory
           - total
           - used
@@ -97,7 +101,7 @@ def hardware_info(context):
         res = subprocess.run(["nvidia-container-cli", "info"], stdout=subprocess.PIPE)
         has_gpu = True
         lines = res.stdout.decode().split("\n")
-        major = ""
+        index = ""
         minor = ""
         for line in lines:
             if ":" in line:
@@ -109,22 +113,22 @@ def hardware_info(context):
                 elif "CUDA version" in line:
                     hardware['cuda'] = parts[1]
                 elif "Device Index" in line:
-                    major = parts[1]
+                    index = parts[1]
                 elif "Device Minor" in line:
                     minor = parts[1]
-                    if not major + "." + minor in gpus:
-                        gpus[major + "." + minor] = dict()
+                    if not index in gpus:
+                        gpus[index] = dict()
                 elif "Architecture" in line:
-                    gpus[major + "." + minor]['compute'] = float(parts[1])
-                    gpus[major + "." + minor]['generation'] = to_hardware_generation(context, float(parts[1]))
+                    gpus[index]['compute'] = float(parts[1])
+                    gpus[index]['generation'] = to_hardware_generation(context, float(parts[1]))
                 elif "Model" in line:
-                    gpus[major + "." + minor]['model'] = parts[1]
+                    gpus[index]['model'] = parts[1]
                 elif "Brand" in line:
-                    gpus[major + "." + minor]['brand'] = parts[1]
+                    gpus[index]['brand'] = parts[1]
                 elif "GPU UUID" in line:
-                    gpus[major + "." + minor]['uuid'] = parts[1]
+                    gpus[index]['uuid'] = parts[1]
                 elif "Bus Location" in line:
-                    gpus[major + "." + minor]['bus'] = ":".join(parts[1:])
+                    gpus[index]['bus'] = ":".join(parts[1:])
     except:
         pass
 
@@ -176,3 +180,26 @@ def hardware_info(context):
         hardware['gpus'] = gpus
 
     return hardware
+
+
+def get_ipv4():
+    """
+    Returns the primary IPv4 address.
+
+    Source: https://stackoverflow.com/a/28950776/4698227
+    Author: fatal_error https://stackoverflow.com/users/1301627/fatal-error
+    License: CC-BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/)
+
+    :return: the IP address
+    :rtype: str
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        result = s.getsockname()[0]
+    except Exception:
+        result = '127.0.0.1'
+    finally:
+        s.close()
+    return result

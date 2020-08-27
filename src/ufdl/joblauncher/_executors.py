@@ -32,7 +32,7 @@ class AbstractJobExecutor(object):
     Ancestor for classes executing jobs.
     """
 
-    def __init__(self, context, work_dir, use_sudo=False, ask_sudo_pw=False):
+    def __init__(self, context, work_dir, cache_dir, use_sudo=False, ask_sudo_pw=False):
         """
         Initializes the executor with the backend context.
 
@@ -40,6 +40,8 @@ class AbstractJobExecutor(object):
         :type context: UFDLServerContext
         :param work_dir: the working directory to use
         :type work_dir: str
+        :param cache_dir: the cache directory to use for models etc
+        :type cache_dir: str
         :param use_sudo: whether to prefix commands with sudo
         :type use_sudo: bool
         :param ask_sudo_pw: whether to prompt user in console for sudo password
@@ -48,6 +50,7 @@ class AbstractJobExecutor(object):
         self._debug = False
         self._context = context
         self._work_dir = work_dir
+        self._cache_dir = cache_dir
         self._job_dir = None
         self._use_sudo = use_sudo
         self._ask_sudo_pw = ask_sudo_pw
@@ -113,6 +116,16 @@ class AbstractJobExecutor(object):
         :rtype: str
         """
         return self._work_dir
+
+    @property
+    def cache_dir(self):
+        """
+        Returns the cache directory. Used for base models etc.
+
+        :return: the directory
+        :rtype: str
+        """
+        return self._cache_dir
 
     @property
     def job_dir(self):
@@ -497,15 +510,14 @@ class AbstractJobExecutor(object):
         """
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
-        # TODO reenable
-        # try:
-        #     acquire_job(self.context, job['pk'])
-        # except:
-        #     self._log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
-        # try:
-        #     start_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
-        # except:
-        #     self._log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
+        try:
+            acquire_job(self.context, job['pk'])
+        except:
+            self._log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
+        try:
+            start_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+        except:
+            self._log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
     def _do_run(self, template, job):
         """
@@ -543,11 +555,10 @@ class AbstractJobExecutor(object):
         if not self._debug:
             self._rmdir(self.job_dir)
         self._job_dir = None
-        # TODO reenable
-        # try:
-        #     finish_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
-        # except:
-        #     self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
+        try:
+            finish_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+        except:
+            self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
     def run(self, template, job):
         """
@@ -594,7 +605,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
     For executing jobs via docker images.
     """
 
-    def __init__(self, context, work_dir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
+    def __init__(self, context, work_dir, cache_dir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
         """
         Initializes the executor with the backend context.
 
@@ -602,6 +613,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type context: UFDLServerContext
         :param work_dir: the working directory to use
         :type work_dir: str
+        :param cache_dir: the cache directory to use for models etc
+        :type cache_dir: str
         :param use_sudo: whether to prefix commands with sudo
         :type use_sudo: bool
         :param ask_sudo_pw: whether to prompt user in console for sudo password
@@ -610,7 +623,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type use_current_user: bool
         """
         super(AbstractDockerJobExecutor, self).__init__(
-            context, work_dir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw)
+            context, work_dir, cache_dir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw)
         self._use_current_user = use_current_user
         self._use_gpu = False
         self._docker_image = None
