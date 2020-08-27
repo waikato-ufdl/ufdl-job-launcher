@@ -167,7 +167,7 @@ def hardware_info(context):
                     key = "free"
                     val = parts[1]
                 if key != "":
-                    for gpu in hardware['gpus'].values():
+                    for gpu in gpus.values():
                         if gpu['bus'] == bus:
                             if not 'memory' in gpu:
                                 gpu['memory'] = dict()
