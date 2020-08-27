@@ -109,10 +109,10 @@ def register_node(context, config, info):
     if 'driver' in info:
         driver = info['driver']
     if ('gpus' in info) and (node_id in info['gpus']):
-        if 'generation' in info['gpus'][str(node_id)]:
-            generation = int(info['gpus'][str(node_id)]['generation']['pk'])
-        if 'generation' in info['gpus'][str(node_id)]:
-            gpu_mem = int(info['gpus'][str(node_id)]['memory']['total'])
+        if 'generation' in info['gpus'][node_id]:
+            generation = int(info['gpus'][node_id]['generation']['pk'])
+        if 'generation' in info['gpus'][node_id]:
+            gpu_mem = int(info['gpus'][node_id]['memory']['total'])
 
     try:
         f = FilterSpec(
