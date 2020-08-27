@@ -14,7 +14,7 @@ from ufdl.json.core.filter.logical import And
 from wai.json.object import Absent
 
 
-def create_server_context(config):
+def create_server_context(config, debug=False):
     """
     Creates the config from the configuration.
 
@@ -23,6 +23,9 @@ def create_server_context(config):
     :return: the server context
     :rtype: UFDLServerContext
     """
+    if debug:
+        logger().debug("Connecting to backend: %s@%s" % (config['backend']['user'], config['backend']['url']))
+
     return UFDLServerContext(
         config['backend']['url'],
         config['backend']['user'],
@@ -171,7 +174,7 @@ def launch_jobs(config, continuous, debug=False):
     :param debug: whether to output debugging information
     :type debug: bool
     """
-    context = create_server_context(config)
+    context = create_server_context(config, debug=debug)
     info = hardware_info(context)
     if debug:
         logger().debug("hardware info: %s" % str(info))
