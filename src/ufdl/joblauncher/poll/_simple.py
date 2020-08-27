@@ -21,7 +21,7 @@ def poll(context, config, hardware_info, debug=False):
     :rtype: dict
     """
     result = None
-    seconds = int(config['simple_poll']['interval'])
+    seconds = int(config['poll_simple']['interval'])
     while result is None:
         jobs = list_jobs(context, filter_spec=generate_filter(hardware_info, debug=debug))
         if len(jobs) > 0:
