@@ -4,7 +4,7 @@ from wai.lazypip import require_class
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
 from ._logging import logger
-from ufdl.joblauncher import get_ipv4
+from ._node import get_ipv4
 from ufdl.joblauncher.poll import simple_poll, rabbitmq_poll
 from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
 import ufdl.pythonclient.functional.core.nodes.node as node

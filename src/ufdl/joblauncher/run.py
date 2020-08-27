@@ -1,7 +1,8 @@
 import argparse
 import traceback
-from ufdl.joblauncher import SYSTEMWIDE_CONFIG, load_config, launch_jobs
-from ufdl.joblauncher import init_logger
+from ._config import SYSTEMWIDE_CONFIG, load_config
+from ._launcher import launch_jobs
+from ._logging import init_logger
 
 
 def main(args=None):

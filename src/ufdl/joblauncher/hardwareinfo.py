@@ -2,8 +2,9 @@ import argparse
 import json
 import traceback
 import yaml
-from ufdl.joblauncher import SYSTEMWIDE_CONFIG, load_config, create_server_context
-from ufdl.joblauncher import hardware_info
+from ._config import SYSTEMWIDE_CONFIG, load_config
+from ._launcher import create_server_context
+from ._node import hardware_info
 
 
 def output_info(context, out_format, out_file=None):
