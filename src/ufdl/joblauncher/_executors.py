@@ -7,6 +7,7 @@ import subprocess
 from subprocess import CompletedProcess
 import tempfile
 import traceback
+from requests.exceptions import HTTPError
 from zipfile import ZipFile, ZIP_STORED
 from ._logging import logger
 from ufdl.pythonclient import UFDLServerContext
@@ -512,12 +513,21 @@ class AbstractJobExecutor(object):
         """
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
+        # acquire
         try:
             acquire_job(self.context, job['pk'])
+        except HTTPError as e:
+            self._log_msg("Failed to acquire job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
+            return
         except:
             self._log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
+            return
+        # start
         try:
             start_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+        except HTTPError as e:
+            self._log_msg("Failed to start job %d!\n%s\%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
+            return
         except:
             self._log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
@@ -557,8 +567,12 @@ class AbstractJobExecutor(object):
         if not self._debug:
             self._rmdir(self.job_dir)
         self._job_dir = None
+
+        # finish job
         try:
             finish_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+        except HTTPError as e:
+            self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
         except:
             self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
