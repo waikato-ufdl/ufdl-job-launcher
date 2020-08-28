@@ -82,8 +82,8 @@ def execute_job(context, config, job, debug=False):
         context,
         config['docker']['work_dir'],
         config['docker']['cache_dir'],
-        use_sudo=config['docker']['use_sudo'],
-        ask_sudo_pw=config['docker']['ask_sudo_pw'],
+        use_sudo=bool(config['docker']['use_sudo']),
+        ask_sudo_pw=bool(config['docker']['ask_sudo_pw']),
         use_current_user=bool(config['docker']['use_current_user'])
     )
     executor.debug = bool(config['general']['debug'])
