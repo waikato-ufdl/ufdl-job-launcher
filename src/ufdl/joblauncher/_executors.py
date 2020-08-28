@@ -802,7 +802,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             self._docker_image[KEY_REGISTRY_URL],
             self._docker_image[KEY_REGISTRY_USERNAME],
             self._docker_image[KEY_REGISTRY_PASSWORD])
-        self._use_gpu = not bool(self._docker_image[KEY_CPU])
+        self._use_gpu = str(self._docker_image[KEY_CPU]) != "true"
         self._pull_image(self._docker_image[KEY_IMAGE_URL])
         return True
 

@@ -83,11 +83,11 @@ def execute_job(context, config, job, debug=False):
         context,
         config['docker']['work_dir'],
         config['docker']['cache_dir'],
-        use_sudo=bool(config['docker']['use_sudo']),
-        ask_sudo_pw=bool(config['docker']['ask_sudo_pw']),
-        use_current_user=bool(config['docker']['use_current_user'])
+        use_sudo=(config['docker']['use_sudo'] == "true"),
+        ask_sudo_pw=(config['docker']['ask_sudo_pw'] == "true"),
+        use_current_user=(config['docker']['use_current_user'] == "true")
     )
-    executor.debug = bool(config['general']['debug'])
+    executor.debug = (config['general']['debug'] == "true")
     executor.compression = int(config['general']['compression'])
     executor.run(template, job)
 

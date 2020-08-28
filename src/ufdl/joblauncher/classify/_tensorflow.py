@@ -88,7 +88,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         )
 
         # stats?
-        if (res is None) and bool(self._parameter(KEY_GENERATE_STATS, job, template)['value']):
+        if (res is None) and (self._parameter(KEY_GENERATE_STATS, job, template)['value'] == "true"):
             for t in ["training", "testing", "validation"]:
                 self._run_image(
                     image,
