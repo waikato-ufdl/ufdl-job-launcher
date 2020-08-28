@@ -144,7 +144,7 @@ def register_node(context, config, info, debug=False):
             pk = int(nodes[0]['pk'])
             node.partial_update(context, pk, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
         else:
-            logger().info("Creatingt node %s/%d" % (ip, gpu_id))
+            logger().info("Creating node %s/%d" % (ip, gpu_id))
             obj = node.create(context, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
             pk = int(obj['pk'])
 
@@ -158,31 +158,6 @@ def register_node(context, config, info, debug=False):
         return False
     except:
         logger().error("Failed to register node!", exc_info=1)
-        return False
-
-
-def deregister_node(context, config):
-    """
-    Deregisters the node with the backend.
-
-    :param context: the UFDL server context
-    :type context: UFDLServerContext
-    :param config: the configuration to use
-    :type config: configparser.ConfigParser
-    :return: whether succeeded
-    :rtype: bool
-    """
-    if 'node_pk' in config['general']:
-        try:
-            node.destroy(context, pk=int(config['general']['node_pk']))
-            return True
-        except HTTPError as e:
-            logger().error("Failed to register node!\n%s" % str(e.response.text), exc_info=1)
-        except:
-            logger().error("Failed to deregister node!", exc_info=1)
-            return False
-    else:
-        logger().warning("No node pk stored in config, cannot deregister!")
         return False
 
 
@@ -227,6 +202,3 @@ def launch_jobs(config, continuous, debug=False):
         # continue polling?
         if not continuous:
             break
-
-    # de-register node
-    deregister_node(context, config)
