@@ -37,8 +37,11 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         :type template: dict
         :param job: the job with the actual values for inputs and parameters
         :type job: dict
+        :return: whether successful
+        :rtype: bool
         """
-        super()._pre_run(template, job)
+        if not super()._pre_run(template, job):
+            return False
 
         # download dataset
         data = self.job_dir + "/data.zip"
@@ -58,6 +61,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         # create remaining directories
         self._mkdir(self.job_dir + "/output")
         self._mkdir(self.job_dir + "/models")
+        return True
 
     def _do_run(self, template, job):
         """

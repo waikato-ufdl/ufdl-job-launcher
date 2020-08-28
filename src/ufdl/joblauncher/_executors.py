@@ -510,6 +510,8 @@ class AbstractJobExecutor(object):
         :type template: dict
         :param job: the job with the actual values for inputs and parameters
         :type job: dict
+        :return: whether successful
+        :rtype: bool
         """
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
@@ -521,15 +523,16 @@ class AbstractJobExecutor(object):
             return
         except:
             self._log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
-            return
+            return False
         # start
         try:
             start_job(self.context, job['pk'], "email")  # TODO retrieve notification type from user
         except HTTPError as e:
             self._log_msg("Failed to start job %d!\n%s\%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
-            return
+            return False
         except:
             self._log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
+        return True
 
     def _do_run(self, template, job):
         """
@@ -586,12 +589,11 @@ class AbstractJobExecutor(object):
         :type job: dict
         :return:
         """
-        pre_run_success = False
         do_run_success = False
         try:
-            self._pre_run(template, job)
-            pre_run_success = True
+            pre_run_success = self._pre_run(template, job)
         except:
+            pre_run_success = False
             self._log_msg("Failed to execute pre-run code:\n%s" % traceback.format_exc())
 
         if pre_run_success:
@@ -782,8 +784,11 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type template: dict
         :param job: the job with the actual values for inputs and parameters
         :type job: dict
+        :return: whether successful
+        :rtype: bool
         """
-        super()._pre_run(template, job)
+        if not super()._pre_run(template, job):
+            return False
 
         # docker image
         if KEY_DOCKER_IMAGE not in job:
@@ -795,6 +800,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             self._docker_image[KEY_REGISTRY_PASSWORD])
         self._use_gpu = not bool(self._docker_image[KEY_CPU])
         self._pull_image(self._docker_image[KEY_IMAGE_URL])
+        return True
 
     def _post_run(self, template, job, pre_run_success, do_run_success):
         """

@@ -34,8 +34,11 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
         :type template: dict
         :param job: the job with the actual values for inputs and parameters
         :type job: dict
+        :return: whether successful
+        :rtype: bool
         """
-        super()._pre_run(template, job)
+        if not super()._pre_run(template, job):
+            return False
 
         # create directories
         self._mkdir(self.job_dir + "/output")
@@ -61,6 +64,7 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
         template_file = self.job_dir + "/output/config.py"
         with open(template_file, "w") as tf:
             tf.write(template_code)
+        return True
 
     def _do_run(self, template, job):
         """
