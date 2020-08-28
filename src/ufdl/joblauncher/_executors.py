@@ -202,6 +202,8 @@ class AbstractJobExecutor(object):
         data = dict()
         data['msg'] = " ".join(str_args).split("\n")
         self._add_log(data)
+        if self.debug:
+            logger().debug(data['msg'])
 
     def _mktmpdir(self):
         """
