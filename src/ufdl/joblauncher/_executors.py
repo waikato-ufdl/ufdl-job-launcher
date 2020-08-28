@@ -524,7 +524,7 @@ class AbstractJobExecutor(object):
             return
         # start
         try:
-            start_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+            start_job(self.context, job['pk'], "email")  # TODO retrieve notification type from user
         except HTTPError as e:
             self._log_msg("Failed to start job %d!\n%s\%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
             return
@@ -570,7 +570,7 @@ class AbstractJobExecutor(object):
 
         # finish job
         try:
-            finish_job(self.context, job['pk'], "")  # TODO retrieve notification type from user
+            finish_job(self.context, job['pk'], pre_run_success and do_run_success, "email")  # TODO retrieve notification type from user
         except HTTPError as e:
             self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
         except:
