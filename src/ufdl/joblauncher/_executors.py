@@ -716,10 +716,11 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: None if successfully logged in, otherwise subprocess.CompletedProcess
         :rtype: subprocess.CompletedProcess
         """
-        if self._execute_can_use_stdin(no_sudo=(not self.use_sudo)):
-            return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password, hide=[user])
+        no_sudo = not self.use_sudo
+        if self._execute_can_use_stdin(no_sudo=no_sudo):
+            return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password, hide=[user], no_sudo=no_sudo)
         else:
-            return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False, hide=[user, password])
+            return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False, hide=[user, password], no_sudo=no_sudo)
 
     def _logout_registry(self, registry):
         """
@@ -730,7 +731,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: None if successfully logged out, otherwise subprocess.CompletedProcess
         :rtype: subprocess.CompletedProcess
         """
-        return self._execute(["docker", "logout", registry], always_return=False)
+        no_sudo = not self.use_sudo
+        return self._execute(["docker", "logout", registry], always_return=False, no_sudo=no_sudo)
 
     def _pull_image(self, image):
         """
@@ -741,7 +743,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: None if successfully pulled, otherwise subprocess.CompletedProcess
         :rtype: subprocess.CompletedProcess
         """
-        return self._execute(["docker", "pull", image], always_return=False)
+        no_sudo = not self.use_sudo
+        return self._execute(["docker", "pull", image], always_return=False, no_sudo=no_sudo)
 
     def _run_image(self, image, docker_args=None, volumes=None, image_args=None):
         """
@@ -758,6 +761,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: None if successfully executed, otherwise subprocess.CompletedProcess
         :rtype: subprocess.CompletedProcess
         """
+        no_sudo = not self.use_sudo
         cmd = ["docker", "run"]
         if docker_args is None:
             docker_args = []
@@ -774,7 +778,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         cmd.append(image)
         if image_args is not None:
             cmd.extend(image_args)
-        return self._execute(cmd, always_return=False)
+        return self._execute(cmd, always_return=False, no_sudo=no_sudo)
 
     def _pre_run(self, template, job):
         """
