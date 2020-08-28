@@ -12,6 +12,7 @@ from ufdl.json.core.filter import FilterSpec
 from ufdl.json.core.filter.field import Exact
 from ufdl.json.core.filter.logical import And
 from wai.json.object import Absent
+from requests.exceptions import HTTPError
 
 
 def create_server_context(config, debug=False):
@@ -20,6 +21,8 @@ def create_server_context(config, debug=False):
 
     :param config: the configuration to use
     :type config: configparser.ConfigParser
+    :param debug: whether to output debugging information
+    :type debug: bool
     :return: the server context
     :rtype: UFDLServerContext
     """
@@ -69,7 +72,6 @@ def execute_job(context, config, job, debug=False):
     :type job: dict
     :param debug: whether to output debugging information
     :type debug: bool
-    :return:
     """
     if debug:
         logger().debug("Job: %s" % str(job))
@@ -89,7 +91,7 @@ def execute_job(context, config, job, debug=False):
     executor.run(template, job)
 
 
-def register_node(context, config, info):
+def register_node(context, config, info, debug=False):
     """
     Registers the node with the backend.
 
@@ -99,10 +101,13 @@ def register_node(context, config, info):
     :type config: configparser.ConfigParser
     :param info: the hardware information, see hardware_info method
     :type info: dict
+    :param debug: whether to output debugging information
+    :type debug: bool
+    :return: whether succeeded
+    :rtype: bool
     """
     ip = get_ipv4()
-    node_id = int(config['general']['node_id'])
-    context.set_node_id(node_id)
+    gpu_id = int(config['general']['gpu_id'])
     driver = Absent
     generation = Absent
     gpu_mem = Absent
@@ -111,11 +116,11 @@ def register_node(context, config, info):
         cpu_mem = int(info['memory']['total'])
     if 'driver' in info:
         driver = info['driver']
-    if ('gpus' in info) and (node_id in info['gpus']):
-        if 'generation' in info['gpus'][node_id]:
-            generation = int(info['gpus'][node_id]['generation']['pk'])
-        if 'generation' in info['gpus'][node_id]:
-            gpu_mem = int(info['gpus'][node_id]['memory']['total'])
+    if ('gpus' in info) and (gpu_id in info['gpus']):
+        if 'generation' in info['gpus'][gpu_id]:
+            generation = int(info['gpus'][gpu_id]['generation']['pk'])
+        if 'generation' in info['gpus'][gpu_id]:
+            gpu_mem = int(info['gpus'][gpu_id]['memory']['total'])
 
     try:
         f = FilterSpec(
@@ -123,26 +128,37 @@ def register_node(context, config, info):
                     And(
                         sub_expressions=[
                             Exact(field="ip", value=ip),
-                            Exact(field="index", value=node_id)
+                            Exact(field="index", value=gpu_id)
                         ]
                     ),
-            ],
-            include_inactive=False
+            ]
         )
+        if debug:
+            logger().debug("Node filter:\n%s" % str(f.to_json_string(indent=2)))
+        logger().info("Listing nodes %s/%d" % (ip, gpu_id))
         nodes = node.list(context, filter_spec=f)
 
         # already stored?
         if len(nodes) > 0:
+            logger().info("Partially updating node %s/%d" % (ip, gpu_id))
             pk = int(nodes[0]['pk'])
-            node.partial_update(context, pk, ip=ip, index=node_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
+            node.partial_update(context, pk, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
         else:
-            obj = node.create(context, ip=ip, index=node_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
+            logger().info("Creatingt node %s/%d" % (ip, gpu_id))
+            obj = node.create(context, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
             pk = int(obj['pk'])
 
         # store pk of node for deregistering
-        config['general']['node_pk'] = pk
+        logger().info("Node PK %d" % pk)
+        config['general']['node_pk'] = str(pk)
+        context.set_node_id(pk)
+        return True
+    except HTTPError as e:
+        logger().error("Failed to register node!\n%s" % str(e.response.text), exc_info=1)
+        return False
     except:
         logger().error("Failed to register node!", exc_info=1)
+        return False
 
 
 def deregister_node(context, config):
@@ -153,14 +169,21 @@ def deregister_node(context, config):
     :type context: UFDLServerContext
     :param config: the configuration to use
     :type config: configparser.ConfigParser
+    :return: whether succeeded
+    :rtype: bool
     """
     if 'node_pk' in config['general']:
         try:
             node.destroy(context, pk=int(config['general']['node_pk']))
+            return True
+        except HTTPError as e:
+            logger().error("Failed to register node!\n%s" % str(e.response.text), exc_info=1)
         except:
             logger().error("Failed to deregister node!", exc_info=1)
+            return False
     else:
         logger().warning("No node pk stored in config, cannot deregister!")
+        return False
 
 
 def launch_jobs(config, continuous, debug=False):
@@ -183,7 +206,8 @@ def launch_jobs(config, continuous, debug=False):
         logger().debug("poll method: %s" % poll)
 
     # register node with backend
-    register_node(context, config, info)
+    if not register_node(context, config, info, debug=debug):
+        return
 
     while True:
         try:
