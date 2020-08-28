@@ -57,7 +57,6 @@ class AbstractJobExecutor(object):
         self._ask_sudo_pw = ask_sudo_pw
         self._log = list()
         self._compression = ZIP_STORED
-        self._log_msg("use_sudo=%s ask_sudo_pw=%s" % (str(self.use_sudo), str(self.ask_sudo_pw)))
 
     @property
     def debug(self):
@@ -514,8 +513,12 @@ class AbstractJobExecutor(object):
         :return: whether successful
         :rtype: bool
         """
+        self._log_msg("use_sudo=%s ask_sudo_pw=%s" % (str(self.use_sudo), str(self.ask_sudo_pw)))
+
+        # jobdir
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
+
         # acquire
         try:
             acquire_job(self.context, job['pk'])
