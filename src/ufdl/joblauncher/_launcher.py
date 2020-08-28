@@ -148,9 +148,8 @@ def register_node(context, config, info, debug=False):
             obj = node.create(context, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
             pk = int(obj['pk'])
 
-        # store pk of node for deregistering
+        # store pk in context
         logger().info("Node PK %d" % pk)
-        config['general']['node_pk'] = str(pk)
         context.set_node_id(pk)
         return True
     except HTTPError as e:
