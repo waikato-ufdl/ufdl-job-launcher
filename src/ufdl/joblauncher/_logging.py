@@ -14,6 +14,7 @@ def init_logger(debug):
     global _logger
     logging.basicConfig()
     _logger = logging.getLogger("ufdl.joblauncher")
+    print("Initializing logging (debug=%s)" % str(debug))
     if debug:
         _logger.setLevel(logging.DEBUG)
     else:
