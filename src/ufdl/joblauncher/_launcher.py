@@ -1,5 +1,6 @@
 import configparser
 import importlib
+import os
 from wai.lazypip import require_class
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
@@ -82,8 +83,8 @@ def execute_job(context, config, job, debug=False):
         context,
         config['docker']['work_dir'],
         config['docker']['cache_dir'],
-        use_sudo=config['docker']['use_sudo'],
-        ask_sudo_pw=config['docker']['ask_sudo_pw'],
+        use_sudo=bool(config['docker']['use_sudo']),
+        ask_sudo_pw=bool(config['docker']['ask_sudo_pw']),
         use_current_user=bool(config['docker']['use_current_user'])
     )
     executor.debug = bool(config['general']['debug'])
@@ -142,15 +143,16 @@ def register_node(context, config, info, debug=False):
         if len(nodes) > 0:
             logger().info("Partially updating node %s/%d" % (ip, gpu_id))
             pk = int(nodes[0]['pk'])
+            context.set_node_id(pk)
             node.partial_update(context, pk, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
         else:
             logger().info("Creating node %s/%d" % (ip, gpu_id))
             obj = node.create(context, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
             pk = int(obj['pk'])
+            context.set_node_id(pk)
 
         # store pk in context
         logger().info("Node PK %d" % pk)
-        context.set_node_id(pk)
         return True
     except HTTPError as e:
         logger().error("Failed to register node!\n%s" % str(e.response.text), exc_info=1)
@@ -171,6 +173,13 @@ def launch_jobs(config, continuous, debug=False):
     :param debug: whether to output debugging information
     :type debug: bool
     """
+    if not os.path.exists(config['docker']['work_dir']):
+        logger().fatal("Work directory does not exist: %s" % config['docker']['work_dir'])
+        exit(1)
+    if not os.path.exists(config['docker']['cache_dir']):
+        logger().fatal("Cache directory does not exist: %s" % config['docker']['cache_dir'])
+        exit(1)
+
     context = create_server_context(config, debug=debug)
     info = hardware_info(context)
     if debug:
