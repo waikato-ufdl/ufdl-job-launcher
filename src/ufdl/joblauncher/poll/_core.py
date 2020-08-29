@@ -27,13 +27,13 @@ def generate_filter(hardware_info, debug=False):
                                 Compare(field="docker_image.cuda_version.version", operator="<=", value=hardware_info["cuda"]),
                                 Compare(field="docker_image.cuda_version.min_driver_version", operator="<=", value=hardware_info["driver"]),
                                 Compare(field="docker_image.min_hardware_generation.min_compute_capability", operator="<=", value=hardware_info["gpus"][0]["compute"]),
-                                IsNull(field="node", invert=True),
+                                IsNull(field="node"),
                         ]),
                         And(
                             sub_expressions=[
                                 IsNull(field="start_time"),
                                 Exact(field="docker_image.cpu", value=True),
-                                IsNull(field="node", invert=True),
+                                IsNull(field="node"),
                         ])
                     ])
             ])
@@ -44,7 +44,7 @@ def generate_filter(hardware_info, debug=False):
                     sub_expressions=[
                         IsNull(field="start_time"),
                         Exact(field="docker_image.cpu", value=True),
-                        IsNull(field="node", invert=True),
+                        IsNull(field="node"),
                 ])
             ],
         )
