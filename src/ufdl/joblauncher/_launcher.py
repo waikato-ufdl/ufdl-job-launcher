@@ -162,6 +162,21 @@ def register_node(context, config, info, debug=False):
         return False
 
 
+def create_dir(path, desc):
+    """
+    Creates the directory, if not present. Performs an exit call if fails to create.
+
+    :param path: the path to check/create
+    :type path: str
+    :param desc: the description of the path
+    :type desc: str
+    """
+    if not os.path.exists(path):
+        logger().warning("%s ('%s') does not exist, creating..." % (desc, path))
+        if not os.path.exists(path):
+            exit(1)
+
+
 def launch_jobs(config, continuous, debug=False):
     """
     Launches the jobs.
@@ -173,12 +188,8 @@ def launch_jobs(config, continuous, debug=False):
     :param debug: whether to output debugging information
     :type debug: bool
     """
-    if not os.path.exists(config['docker']['work_dir']):
-        logger().fatal("Work directory does not exist: %s" % config['docker']['work_dir'])
-        exit(1)
-    if not os.path.exists(config['docker']['cache_dir']):
-        logger().fatal("Cache directory does not exist: %s" % config['docker']['cache_dir'])
-        exit(1)
+    create_dir(config['docker']['work_dir'], "Work directory")
+    create_dir(config['docker']['cache_dir'], "Cache directory")
 
     context = create_server_context(config, debug=debug)
     info = hardware_info(context)
