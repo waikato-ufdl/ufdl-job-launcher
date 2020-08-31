@@ -33,6 +33,13 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
         if not super()._pre_run(template, job):
             return False
 
+        # shared memory size
+        try:
+            shm_size = self._parameter('shared_memory_size', job, template)['value']
+        except:
+            shm_size = "8G"
+        self._additional_gpu_flags.extend(["--shm-size", shm_size])
+
         # create directories
         self._mkdir(self.job_dir + "/output")
         self._mkdir(self.job_dir + "/models")

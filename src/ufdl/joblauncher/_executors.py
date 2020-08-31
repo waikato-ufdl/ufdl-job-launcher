@@ -635,6 +635,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         self._use_gpu = False
         self._gpu_id = int(config['docker']['gpu_id'])
         self._docker_image = None
+        self._additional_gpu_flags = []
 
     @property
     def use_current_user(self):
@@ -686,6 +687,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
     def _gpu_flags(self):
         """
         If the GPU is to be used, returns the relevant flags as list.
+        Additional GPU flags are appended from self._additional_gpu_flags (if GPU used).
 
         :return: the list of flags, empty list if none required
         :rtype: list
@@ -700,6 +702,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
                     result.append("--gpus=%s" % str(self.gpu_id))
                 else:
                     result.append("--runtime=nvidia")
+            result.extend(self._additional_gpu_flags)
 
         return result
 
