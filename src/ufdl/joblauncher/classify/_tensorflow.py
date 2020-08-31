@@ -11,23 +11,16 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
     For executing Tensorflow image classification jobs.
     """
 
-    def __init__(self, context, work_dir, cache_dir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
+    def __init__(self, context, config):
         """
         Initializes the executor with the backend context.
 
         :param context: the server context
         :type context: UFDLServerContext
-        :param work_dir: the working directory to use
-        :type work_dir: str
-        :param cache_dir: the cache directory to use for models etc
-        :type cache_dir: str
-        :param use_sudo: whether to prefix commands with sudo
-        :type use_sudo: bool
-        :param ask_sudo_pw: whether to prompt user in console for sudo password
-        :type ask_sudo_pw: bool
+        :param config: the configuration to use
+        :type config: configparser.ConfigParser
         """
-        super(ImageClassificationTrain_TF_1_14, self).__init__(
-            context, work_dir, cache_dir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw, use_current_user=use_current_user)
+        super(ImageClassificationTrain_TF_1_14, self).__init__(context, config)
 
     def _pre_run(self, template, job):
         """

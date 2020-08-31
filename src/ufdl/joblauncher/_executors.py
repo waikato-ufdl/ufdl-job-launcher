@@ -33,30 +33,24 @@ class AbstractJobExecutor(object):
     Ancestor for classes executing jobs.
     """
 
-    def __init__(self, context, work_dir, cache_dir, use_sudo=False, ask_sudo_pw=False):
+    def __init__(self, context, config):
         """
-        Initializes the executor with the backend context.
+        Initializes the executor with the backend context and configuration.
 
         :param context: the server context
         :type context: UFDLServerContext
-        :param work_dir: the working directory to use
-        :type work_dir: str
-        :param cache_dir: the cache directory to use for models etc
-        :type cache_dir: str
-        :param use_sudo: whether to prefix commands with sudo
-        :type use_sudo: bool
-        :param ask_sudo_pw: whether to prompt user in console for sudo password
-        :type ask_sudo_pw: bool
+        :param config: the configuration to use
+        :type config: configparser.ConfigParser
         """
-        self._debug = False
+        self._debug = (config['general']['debug'] == "true")
         self._context = context
-        self._work_dir = work_dir
-        self._cache_dir = cache_dir
+        self._work_dir = config['docker']['work_dir']
+        self._cache_dir = config['docker']['cache_dir']
         self._job_dir = None
-        self._use_sudo = use_sudo
-        self._ask_sudo_pw = ask_sudo_pw
+        self._use_sudo = (config['docker']['use_sudo'] == "true")
+        self._ask_sudo_pw = (config['docker']['ask_sudo_pw'] == "true")
         self._log = list()
-        self._compression = ZIP_STORED
+        self._compression = int(config['general']['compression'])
 
     @property
     def debug(self):
@@ -627,26 +621,17 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
     For executing jobs via docker images.
     """
 
-    def __init__(self, context, work_dir, cache_dir, use_sudo=False, ask_sudo_pw=False, use_current_user=True):
+    def __init__(self, context, config):
         """
-        Initializes the executor with the backend context.
+        Initializes the executor with the backend context and configuration.
 
         :param context: the server context
         :type context: UFDLServerContext
-        :param work_dir: the working directory to use
-        :type work_dir: str
-        :param cache_dir: the cache directory to use for models etc
-        :type cache_dir: str
-        :param use_sudo: whether to prefix commands with sudo
-        :type use_sudo: bool
-        :param ask_sudo_pw: whether to prompt user in console for sudo password
-        :type ask_sudo_pw: bool
-        :param use_current_user: whether to run as root (False) or as user launching the image (True)
-        :type use_current_user: bool
+        :param config: the configuration to use
+        :type config: configparser.ConfigParser
         """
-        super(AbstractDockerJobExecutor, self).__init__(
-            context, work_dir, cache_dir, use_sudo=use_sudo, ask_sudo_pw=ask_sudo_pw)
-        self._use_current_user = use_current_user
+        super(AbstractDockerJobExecutor, self).__init__(context, config)
+        self._use_current_user = (config['docker']['use_current_user'] == "true")
         self._use_gpu = False
         self._docker_image = None
 

@@ -79,16 +79,7 @@ def execute_job(context, config, job, debug=False):
     template = jobtemplate_retrieve(context, job['template']['pk'])
 
     cls = load_executor_class(template["executor_class"], template["required_packages"])
-    executor = cls(
-        context,
-        config['docker']['work_dir'],
-        config['docker']['cache_dir'],
-        use_sudo=(config['docker']['use_sudo'] == "true"),
-        ask_sudo_pw=(config['docker']['ask_sudo_pw'] == "true"),
-        use_current_user=(config['docker']['use_current_user'] == "true")
-    )
-    executor.debug = (config['general']['debug'] == "true")
-    executor.compression = int(config['general']['compression'])
+    executor = cls(context, config)
     executor.run(template, job)
 
 
