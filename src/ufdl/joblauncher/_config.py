@@ -47,5 +47,4 @@ def load_config(config_file=None):
     _check_section(config_file, config, "backend", ["url", "user", "password"])
     _check_section(config_file, config, "docker", ["work_dir", "cache_dir", "use_current_user"])
     _check_section(config_file, config, "poll_simple", ["interval"])
-    _check_section(config_file, config, "poll_rabbitmq", ["host", "port", "queue"])
     return config
