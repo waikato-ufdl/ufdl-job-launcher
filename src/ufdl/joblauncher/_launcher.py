@@ -213,6 +213,9 @@ def launch_jobs(config, continuous, debug=False):
                 exit(1)
             if job is not None:
                 execute_job(context, config, job, debug=debug)
+        except KeyboardInterrupt:
+            logger().error("Polling/execution interrupted!", exc_info=1)
+            break
         except:
             logger().error("Failed to poll/execute job!", exc_info=1)
             time.sleep(backenderror_wait)
