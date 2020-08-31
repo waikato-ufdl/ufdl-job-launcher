@@ -633,6 +633,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         super(AbstractDockerJobExecutor, self).__init__(context, config)
         self._use_current_user = (config['docker']['use_current_user'] == "true")
         self._use_gpu = False
+        self._gpu_id = int(config['docker']['gpu_id'])
         self._docker_image = None
 
     @property
@@ -644,6 +645,16 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :rtype: bool
         """
         return self._use_current_user
+
+    @property
+    def gpu_id(self):
+        """
+        Returns the GPU ID for this executor to use (corresponds to GPU index).
+
+        :return: the GPU ID
+        :rtype: int
+        """
+        return self._gpu_id
 
     def _version(self, include_patch=True):
         """
@@ -686,7 +697,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             if version is not None:
                 version_num = float(version)
                 if version_num >= 19.03:
-                    result.append("--gpus=all")
+                    result.append("--gpus=%s" % str(self.gpu_id))
                 else:
                     result.append("--runtime=nvidia")
 
