@@ -156,7 +156,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
             self.job_dir + "/image_lists.zip")
 
         # zip+upload predictions/stats
-        if do_run_success and bool(self._parameter(KEY_GENERATE_STATS, job, template)['value']):
+        if do_run_success and (self._parameter(KEY_GENERATE_STATS, job, template)['value'] == "true"):
             self._compress_and_upload(
                 pk, "statistics", "csv",
                 glob(self.job_dir + "/output/*.csv"),
