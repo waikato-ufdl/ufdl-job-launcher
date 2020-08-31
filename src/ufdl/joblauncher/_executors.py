@@ -699,7 +699,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             if version is not None:
                 version_num = float(version)
                 if version_num >= 19.03:
-                    result.append("--gpus=%s" % str(self.gpu_id))
+                    result.append('--gpus="device=%s"' % str(self.gpu_id))
                 else:
                     result.append("--runtime=nvidia")
             result.extend(self._additional_gpu_flags)
