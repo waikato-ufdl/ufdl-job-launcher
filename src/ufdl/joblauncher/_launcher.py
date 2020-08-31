@@ -1,6 +1,7 @@
 import configparser
 import importlib
 import os
+import time
 from wai.lazypip import require_class
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
@@ -190,6 +191,9 @@ def launch_jobs(config, continuous, debug=False):
     if debug:
         logger().debug("hardware info: %s" % str(info))
     poll = config['general']['poll']
+    backenderror_wait = 10
+    if 'poll_backenderror_wait' in config['general']:
+        backenderror_wait = int(config['general']['poll_backenderror_wait'])
     if debug:
         logger().debug("poll method: %s" % poll)
 
@@ -211,6 +215,7 @@ def launch_jobs(config, continuous, debug=False):
                 execute_job(context, config, job, debug=debug)
         except:
             logger().error("Failed to poll/execute job!", exc_info=1)
+            time.sleep(backenderror_wait)
 
         # continue polling?
         if not continuous:
