@@ -98,7 +98,7 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
                 )
 
 
-    def _post_run(self, template, job, pre_run_success, do_run_success):
+    def _post_run(self, template, job, pre_run_success, do_run_success, error):
         """
         Hook method after the actual job has been run. Will always be executed.
 
@@ -110,6 +110,8 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
         :type pre_run_success: bool
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
         :type do_run_success: bool
+        :param error: any error that may have occurred, None if none occurred
+        :type error: str
         """
 
         pk = int(job['pk'])
@@ -155,4 +157,4 @@ class ImageClassificationTrain_TF_1_14(AbstractDockerJobExecutor):
                 glob(self.job_dir + "/output/*.csv"),
                 self.job_dir + "/statistics.zip")
 
-        super()._post_run(template, job, pre_run_success, do_run_success)
+        super()._post_run(template, job, pre_run_success, do_run_success, error)

@@ -8,12 +8,13 @@ from subprocess import CompletedProcess
 import tempfile
 import traceback
 from requests.exceptions import HTTPError
-from zipfile import ZipFile, ZIP_STORED
+from zipfile import ZipFile
 from ._logging import logger
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
 from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job
+from wai.json.object import Absent
 
 KEY_CPU = 'cpu'
 
@@ -51,6 +52,7 @@ class AbstractJobExecutor(object):
         self._ask_sudo_pw = (config['docker']['ask_sudo_pw'] == "true")
         self._log = list()
         self._compression = int(config['general']['compression'])
+        self._notification_type = None
 
     @property
     def debug(self):
@@ -151,6 +153,16 @@ class AbstractJobExecutor(object):
         :rtype: bool
         """
         return self._ask_sudo_pw
+
+    @property
+    def notification_type(self):
+        """
+        Returns the type of notification to send out.
+
+        :return: the type of notification (eg email)
+        :rtype: str
+        """
+        return self._notification_type
 
     def _add_log(self, data):
         """
@@ -513,6 +525,9 @@ class AbstractJobExecutor(object):
         self._job_dir = self._mktmpdir()
         self._log_msg("Created jobdir:", self.job_dir)
 
+        # TODO retrieve notification type from user
+        self._notification_type = "email"
+
         # acquire
         try:
             acquire_job(self.context, job['pk'])
@@ -524,7 +539,7 @@ class AbstractJobExecutor(object):
             return False
         # start
         try:
-            start_job(self.context, job['pk'], "email")  # TODO retrieve notification type from user
+            start_job(self.context, job['pk'], self.notification_type)
         except HTTPError as e:
             self._log_msg("Failed to start job %d!\n%s\%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
             return False
@@ -543,7 +558,7 @@ class AbstractJobExecutor(object):
         """
         raise NotImplemented()
 
-    def _post_run(self, template, job, pre_run_success, do_run_success):
+    def _post_run(self, template, job, pre_run_success, do_run_success, error):
         """
         Hook method after the actual job has been run. Will always be executed.
 
@@ -555,6 +570,8 @@ class AbstractJobExecutor(object):
         :type pre_run_success: bool
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
         :type do_run_success: bool
+        :param error: any error that may have occurred, None if none occurred
+        :type error: str
         """
         log = self.job_dir + "/log.json"
         try:
@@ -571,7 +588,9 @@ class AbstractJobExecutor(object):
 
         # finish job
         try:
-            finish_job(self.context, job['pk'], pre_run_success and do_run_success, "email")  # TODO retrieve notification type from user
+            if error is None:
+                error = Absent
+            finish_job(self.context, job['pk'], pre_run_success and do_run_success, self.notification_type, error=error)
         except HTTPError as e:
             self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
         except:
@@ -587,22 +606,25 @@ class AbstractJobExecutor(object):
         :type job: dict
         :return:
         """
+        error = None
         do_run_success = False
         try:
             pre_run_success = self._pre_run(template, job)
         except:
             pre_run_success = False
-            self._log_msg("Failed to execute pre-run code:\n%s" % traceback.format_exc())
+            error = "Failed to execute pre-run code:\n%s" % traceback.format_exc()
+            self._log_msg(error)
 
         if pre_run_success:
             try:
                 self._do_run(template, job)
                 do_run_success = True
             except:
-                self._log_msg("Failed to execute do-run code:\n%s" % traceback.format_exc())
+                error = "Failed to execute do-run code:\n%s" % traceback.format_exc()
+                self._log_msg(error)
 
         try:
-            self._post_run(template, job, pre_run_success, do_run_success)
+            self._post_run(template, job, pre_run_success, do_run_success, error)
         except:
             self._log_msg("Failed to execute post-run code:\n%s" % traceback.format_exc())
 
@@ -805,7 +827,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         self._pull_image(self._docker_image[KEY_IMAGE_URL])
         return True
 
-    def _post_run(self, template, job, pre_run_success, do_run_success):
+    def _post_run(self, template, job, pre_run_success, do_run_success, error):
         """
         Hook method after the actual job has been run. Will always be executed.
 
@@ -817,9 +839,11 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type pre_run_success: bool
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
         :type do_run_success: bool
+        :param error: any error that may have occurred, None if none occurred
+        :type error: str
         """
         if self._docker_image is not None:
             self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
             self._docker_image = None
 
-        super()._post_run(template, job, pre_run_success, do_run_success)
+        super()._post_run(template, job, pre_run_success, do_run_success, error)
