@@ -200,8 +200,13 @@ def launch_jobs(config, continuous, debug=False):
         logger().debug("poll method: %s" % poll)
 
     # register node with backend
-    if not register_node(context, config, info, debug=debug):
-        return
+    while True:
+        if not register_node(context, config, info, debug=debug):
+            sleep.sleep()
+            sleep.next()
+        else:
+            sleep.reset()
+            break
 
     while True:
         try:
