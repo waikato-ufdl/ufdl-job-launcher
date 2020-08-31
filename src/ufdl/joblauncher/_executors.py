@@ -633,7 +633,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         super(AbstractDockerJobExecutor, self).__init__(context, config)
         self._use_current_user = (config['docker']['use_current_user'] == "true")
         self._use_gpu = False
-        self._gpu_id = int(config['docker']['gpu_id'])
+        self._gpu_id = int(config['general']['gpu_id'])
         self._docker_image = None
         self._additional_gpu_flags = []
 
