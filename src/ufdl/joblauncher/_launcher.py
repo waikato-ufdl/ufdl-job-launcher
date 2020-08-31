@@ -7,7 +7,7 @@ from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
 from ._logging import logger
 from ._node import get_ipv4
-from ufdl.joblauncher.poll import simple_poll, rabbitmq_poll
+from ufdl.joblauncher.poll import simple_poll
 from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
 import ufdl.pythonclient.functional.core.nodes.node as node
 from ufdl.json.core.filter import FilterSpec
@@ -206,8 +206,6 @@ def launch_jobs(config, continuous, debug=False):
             job = None
             if poll == "simple":
                 job = simple_poll(context, config, info, debug=debug)
-            elif poll == "rabbitmq":
-                job = rabbitmq_poll(context, config, info, debug=debug)
             else:
                 logger().fatal("Unknown poll method: %s" % poll)
                 exit(1)

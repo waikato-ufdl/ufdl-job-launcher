@@ -41,7 +41,6 @@ setup(
         "ufdl.pythonclient",
         "ufdl.json-messages",
         "wai.lazypip",
-        "pika",
         "tensorflow",
         "psutil",
         "pyyaml",
