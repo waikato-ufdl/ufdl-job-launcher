@@ -590,6 +590,10 @@ class AbstractJobExecutor(object):
         try:
             if error is None:
                 error = Absent
+                if not pre_run_success:
+                    error = "An error occurred during pre-run, check log!"
+                elif not do_run_success:
+                    error = "An error occurred during run, check log!"
             finish_job(self.context, job['pk'], pre_run_success and do_run_success, self.notification_type, error=error)
         except HTTPError as e:
             self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
