@@ -39,7 +39,7 @@ def load_config(config_file=None):
         config_file = SYSTEMWIDE_CONFIG
 
     if not os.path.exists(config_file):
-        raise("Config file '%s' does not exist!" % config_file)
+        raise Exception("Config file '%s' does not exist!" % config_file)
 
     config = configparser.ConfigParser()
     config.read(config_file)
