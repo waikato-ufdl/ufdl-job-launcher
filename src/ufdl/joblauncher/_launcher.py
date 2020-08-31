@@ -173,7 +173,10 @@ def create_dir(path, desc):
     """
     if not os.path.exists(path):
         logger().warning("%s ('%s') does not exist, creating..." % (desc, path))
-        if not os.path.exists(path):
+        try:
+            os.makedirs(path, exist_ok=True)
+        except:
+            logger().fatal("Failed to create %s ('%s')!" % (desc, path))
             exit(1)
 
 
@@ -188,8 +191,8 @@ def launch_jobs(config, continuous, debug=False):
     :param debug: whether to output debugging information
     :type debug: bool
     """
-    create_dir(config['docker']['work_dir'], "Work directory")
-    create_dir(config['docker']['cache_dir'], "Cache directory")
+    create_dir(config['docker']['work_dir'], "work directory")
+    create_dir(config['docker']['cache_dir'], "cache directory")
 
     context = create_server_context(config, debug=debug)
     info = hardware_info(context)
