@@ -1,9 +1,10 @@
 import configparser
 import time
 from .._logging import logger
+from .._sleep import SleepSchedule
+from ._core import generate_filter
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.jobs.job import list as list_jobs
-from ._core import generate_filter
 
 def poll(context, config, hardware_info, debug=False):
     """
@@ -21,7 +22,7 @@ def poll(context, config, hardware_info, debug=False):
     :rtype: dict
     """
     result = None
-    seconds = int(config['poll_simple']['interval'])
+    sleep = SleepSchedule(config['poll_simple']['interval'], debug=debug, debug_msg="Waiting for %s seconds before next poll")
     while result is None:
         jobs = list_jobs(context, filter_spec=generate_filter(hardware_info, debug=debug))
         if len(jobs) > 0:
@@ -29,7 +30,6 @@ def poll(context, config, hardware_info, debug=False):
             return result
 
         if result is None:
-            if debug:
-                logger().debug("waiting for " + str(seconds) + " seconds before next poll")
-            time.sleep(seconds)
+            sleep.sleep()
+            sleep.next()
 
