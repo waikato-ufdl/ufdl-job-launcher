@@ -87,9 +87,8 @@ class SleepSchedule(object):
         """
         Moves on to the next schedule (if possible, otherwise uses last).
         """
-        self._current += 1
-        if self._current >= len(self.schedule):
-            self.reset()
+        if self._current + 1 < len(self.schedule):
+            self._current += 1
 
     def __str__(self):
         """
