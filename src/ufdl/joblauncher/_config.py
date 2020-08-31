@@ -1,4 +1,5 @@
 import configparser
+import os
 
 SYSTEMWIDE_CONFIG = "/etc/ufdl/job-launcher.conf"
 """ the system-wide config file. """
@@ -36,6 +37,9 @@ def load_config(config_file=None):
     """
     if config_file is None:
         config_file = SYSTEMWIDE_CONFIG
+
+    if not os.path.exists(config_file):
+        raise("Config file '%s' does not exist!" % config_file)
 
     config = configparser.ConfigParser()
     config.read(config_file)
