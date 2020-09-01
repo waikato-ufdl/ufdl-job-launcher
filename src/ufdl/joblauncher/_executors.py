@@ -732,6 +732,16 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
 
         return result
 
+    def _registry_login_required(self):
+        """
+        Returns whether it is necessary to log into the registry.
+
+        :return: True if necessary to log in
+        :rtype: bool
+        """
+        return (self._docker_image[KEY_REGISTRY_USERNAME] is not None) \
+               and (self._docker_image[KEY_REGISTRY_USERNAME] != "")
+
     def _login_registry(self, registry, user, password):
         """
         Logs into the specified registry.
@@ -823,10 +833,14 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         if KEY_DOCKER_IMAGE not in job:
             raise Exception("Docker image PK not defined in job (key: %s)!\n%s" % (KEY_DOCKER_IMAGE, str(job)))
         self._docker_image = docker_retrieve(self.context, int(job[KEY_DOCKER_IMAGE]['pk']))
-        self._login_registry(
-            self._docker_image[KEY_REGISTRY_URL],
-            self._docker_image[KEY_REGISTRY_USERNAME],
-            self._docker_image[KEY_REGISTRY_PASSWORD])
+        if self._registry_login_required():
+            res = self._login_registry(
+                self._docker_image[KEY_REGISTRY_URL],
+                self._docker_image[KEY_REGISTRY_USERNAME],
+                self._docker_image[KEY_REGISTRY_PASSWORD])
+            if res is not None:
+                logger().fatal("Failed to log into registry")
+                raise Exception(res.stderr)
         self._use_gpu = str(self._docker_image[KEY_CPU]) != "true"
         self._pull_image(self._docker_image[KEY_IMAGE_URL])
         return True
@@ -847,7 +861,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type error: str
         """
         if self._docker_image is not None:
-            self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
+            if self._registry_login_required():
+                self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
             self._docker_image = None
 
         super()._post_run(template, job, pre_run_success, do_run_success, error)
