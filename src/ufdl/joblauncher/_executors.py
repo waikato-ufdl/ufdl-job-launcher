@@ -316,8 +316,6 @@ class AbstractJobExecutor(object):
                 process = subprocess.Popen(full, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = process.communicate(input=stdin.encode())
                 result = CompletedProcess(full, process.returncode, stdout=stdout, stderr=stderr)
-                # result = subprocess.run(full, capture_output=capture_output, stdin=subprocess.PIPE)
-                # result.stdin.write(stdin)
             else:
                 result = subprocess.run(full, capture_output=capture_output)
         except:
