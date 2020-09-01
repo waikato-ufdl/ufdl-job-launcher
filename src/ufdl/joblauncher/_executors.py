@@ -241,6 +241,26 @@ class AbstractJobExecutor(object):
         self._log_msg("rmdir:", directory)
         shutil.rmtree(directory, ignore_errors=True)
 
+    def _to_logentry(self, completed, hide):
+        """
+        Turns the CompletedProcess object into a log entry.
+
+        :param completed: the CompletedProcess object to convert
+        :type completed: CompletedProcess
+        :param hide: the list of strings to obscure in the log message
+        :type hide: list
+        :return: the log entry
+        :rtype: dict
+        """
+        result = dict()
+        result['cmd'] = self._obscure(completed.args, hide)
+        if completed.stdout is not None:
+            result['stdout'] = completed.stdout.decode().split("\n")
+        if completed.stdout is not None:
+            result['stderr'] = completed.stderr.decode().split("\n")
+        result['returncode'] = completed.returncode
+        return result
+
     def _execute_can_use_stdin(self, no_sudo=None):
         """
         Returns whether the _execute function can use stdin.
@@ -300,14 +320,7 @@ class AbstractJobExecutor(object):
         except:
             result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
 
-        log_data = dict()
-        log_data['cmd'] = self._obscure(result.args, hide)
-        if result.stdout is not None:
-            log_data['stdout'] = result.stdout.decode().split("\n")
-        if result.stdout is not None:
-            log_data['stderr'] = result.stderr.decode().split("\n")
-        log_data['returncode'] = result.returncode
-        self._add_log(log_data)
+        self._add_log(self._to_logentry(result, hide))
 
         if always_return or (result.returncode > 0):
             return result
@@ -840,7 +853,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
                 self._docker_image[KEY_REGISTRY_PASSWORD])
             if res is not None:
                 logger().fatal("Failed to log into registry")
-                raise Exception(res.stderr)
+                raise Exception(self._to_logentry(res, [self._docker_image[KEY_REGISTRY_USERNAME]]))
         self._use_gpu = str(self._docker_image[KEY_CPU]) != "true"
         self._pull_image(self._docker_image[KEY_IMAGE_URL])
         return True
