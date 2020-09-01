@@ -218,10 +218,8 @@ class ImageClassificationPredict_TF_1_14(AbstractDockerJobExecutor):
         # download model
         model = self.job_dir + "/model.zip"
         pk = int(self._input("model", job, template)["value"])
-        name = self._input("model", job, template)["type"]
-        get_output(self.context, pk, name)
         with open(model, "wb") as zip_file:
-            for b in get_output(self.context, pk, name):
+            for b in get_output(self.context, pk, "model"):
                 zip_file.write(b)
 
         # decompress model
