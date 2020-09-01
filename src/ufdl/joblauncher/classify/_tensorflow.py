@@ -294,7 +294,7 @@ class ImageClassificationPredict_TF_1_14(AbstractDockerJobExecutor):
                     for row in reader:
                         if ('probability' in row) and ('label' in row):
                             if float(row['probability']) > prob:
-                                prob = row['probability']
+                                prob = float(row['probability'])
                                 label = row['label']
                 # set category for file
                 img_name = os.path.basename(f)
