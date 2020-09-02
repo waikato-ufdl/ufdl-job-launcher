@@ -24,3 +24,50 @@ Launcher framework for executing jobs in the UFDL framework.
 ## Scripts
 
 * `dev_init.sh` - sets up a development virtual environment
+
+
+## Tools
+
+The following command-line tools (i.e., entry points) are available:
+
+### ufdl-joblauncher
+
+```
+usage: ufdl-joblauncher [-h] [-C FILE] [-c]
+
+Starts the UFDL job-launcher.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -C FILE, --config FILE
+                        The configuration to use if not the system wide one
+                        (/etc/ufdl/job-launcher.conf). (default: None)
+  -c, --continuous      For continuous polling for jobs rather than stopping
+                        after executing the first one. (default: False)
+```
+
+### ufdl-hwinfo
+
+```
+usage: ufdl-hwinfo [-h] [-C FILE] [-F FORMAT] [-O FILE]
+
+Outputs UFDL hardware information.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -C FILE, --config FILE
+                        The configuration to use if not the system wide one
+                        (/etc/ufdl/job-launcher.conf). (default: None)
+  -F FORMAT, --format FORMAT
+                        The format to use for the output of the information.
+                        (default: yaml)
+  -O FILE, --output FILE
+                        The file to store the information in, otherwise stdout
+                        is used. (default: None)
+```
+
+
+## Example configuration
+
+An example configuration is available from 
+[examples/job-launcher-example.conf](examples/job-launcher-example.conf).
