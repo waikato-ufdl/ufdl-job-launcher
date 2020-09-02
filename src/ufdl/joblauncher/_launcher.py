@@ -56,7 +56,7 @@ def load_executor_class(class_name, required_packages):
     if required_packages is not None and (required_packages == ""):
         required_packages = None
     if required_packages is not None:
-        require_class(module_name, class_name, packages=required_packages.split(" "))
+        require_class(module_name, class_name, packages=required_packages.split(" "), pip_args=["--upgrade"])
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
