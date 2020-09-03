@@ -55,12 +55,19 @@ def load_executor_class(class_name, required_packages, debug=False):
     if required_packages is not None and (required_packages == ""):
         required_packages = None
     if required_packages is not None:
-        install_packages(required_packages.split(" "), pip_args=["--upgrade"])
         # TODO
-        print(logger())
+        print("before pip.main")
         print(logger().name)
         print(logger().level)
         print(logger().disabled)
+        print(logger().handlers)
+        install_packages(required_packages.split(" "), pip_args=["--upgrade"])
+        # TODO
+        print("after pip.main")
+        print(logger().name)
+        print(logger().level)
+        print(logger().disabled)
+        print(logger().handlers)
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
