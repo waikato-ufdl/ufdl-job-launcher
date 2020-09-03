@@ -3,9 +3,6 @@ import logging
 _logger = None
 """ the global logger instance to use. """
 
-_logger_counter = 0
-""" calling pip.main disables logging somehow, we create a new logger name each time we initialize logging. """
-
 def init_logger(debug):
     """
     Initializes the logging.
@@ -14,10 +11,8 @@ def init_logger(debug):
     :type debug: bool
     """
     global _logger
-    global _logger_counter
-    _logger_counter += 1
     logging.basicConfig()
-    _logger = logging.getLogger("ufdl.joblauncher-%s" % str(_logger_counter))
+    _logger = logging.getLogger("ufdl.joblauncher")
     print("Initializing logging (debug=%s)" % str(debug))
     if debug:
         _logger.setLevel(logging.DEBUG)
