@@ -1,5 +1,6 @@
 import configparser
 import importlib
+import logging
 import os
 from wai.lazypip import install_packages
 from ufdl.pythonclient import UFDLServerContext
@@ -57,17 +58,17 @@ def load_executor_class(class_name, required_packages, debug=False):
     if required_packages is not None:
         # TODO
         print("before pip.main")
-        print(logger().name)
-        print(logger().level)
-        print(logger().disabled)
-        print(logger().handlers)
+        print(logging.root.name)
+        print(logging.root.level)
+        print(logging.root.disabled)
+        print(logging.root.handlers)
         install_packages(required_packages.split(" "), pip_args=["--upgrade"])
         # TODO
         print("after pip.main")
-        print(logger().name)
-        print(logger().level)
-        print(logger().disabled)
-        print(logger().handlers)
+        print(logging.root.name)
+        print(logging.root.level)
+        print(logging.root.disabled)
+        print(logging.root.handlers)
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
