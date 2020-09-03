@@ -282,7 +282,7 @@ class ImageClassificationPredict_TF_1_14(AbstractDockerJobExecutor):
                 self.job_dir + "/predictions.zip")
 
         # read labels and add to dataset
-        if do_run_success:
+        if do_run_success and (self._parameter('store-predictions', job, template)['value'] == "true"):
             try:
                 for f in glob(self.job_dir + "/prediction/out/*"):
                     if f.endswith(".csv"):
