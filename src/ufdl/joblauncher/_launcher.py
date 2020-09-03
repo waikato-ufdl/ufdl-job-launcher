@@ -4,7 +4,7 @@ import os
 from wai.lazypip import install_packages
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
-from ._logging import logger
+from ._logging import logger, init_logger
 from ._node import get_ipv4
 from ._sleep import SleepSchedule
 from ufdl.joblauncher.poll import simple_poll
@@ -37,7 +37,7 @@ def create_server_context(config, debug=False):
         config['backend']['password'])
 
 
-def load_executor_class(class_name, required_packages):
+def load_executor_class(class_name, required_packages, debug=False):
     """
     Loads the executor class and returns it. Will install any required packages beforehand.
     Will fail with an exception if class cannot be loaded.
@@ -56,6 +56,8 @@ def load_executor_class(class_name, required_packages):
         required_packages = None
     if required_packages is not None:
         install_packages(required_packages.split(" "), pip_args=["--upgrade"])
+        # reinitialize the logger
+        init_logger(debug=debug)
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
@@ -79,7 +81,7 @@ def execute_job(context, config, job, debug=False):
         logger().debug("Job: %s" % str(job))
     template = jobtemplate_retrieve(context, job['template']['pk'])
 
-    cls = load_executor_class(template["executor_class"], template["required_packages"])
+    cls = load_executor_class(template["executor_class"], template["required_packages"], debug=debug)
     executor = cls(context, config)
     executor.run(template, job)
 
