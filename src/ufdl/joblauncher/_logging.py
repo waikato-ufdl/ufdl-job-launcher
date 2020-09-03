@@ -30,29 +30,3 @@ def logger():
     if _logger is None:
         init_logger(False)
     return _logger
-
-
-def backup_root_logger():
-    """
-    Creates a backup of the root logger.
-
-    :return: the backup
-    :rtype: dict
-    """
-    result = dict()
-    result['level'] = logging.root.level
-    result['disabled'] = logging.root.disabled
-    result['handlers'] = logging.root.handlers[:]
-    return result
-
-def restore_root_logger(backup):
-    """
-    Restores the root logger from the backup.
-
-    :param backup: the backup (level/disable/handlers)
-    :type backup: dict
-    """
-
-    logging.root.level = backup['level']
-    logging.root.disabled = backup['disabled']
-    logging.root.handlers = backup['handlers']
