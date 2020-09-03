@@ -71,3 +71,30 @@ optional arguments:
 
 An example configuration is available from 
 [examples/job-launcher-example.conf](examples/job-launcher-example.conf).
+
+
+## Executors
+
+Executors are the workhorses in the job-launcher framework that interpret and execute
+the jobs that are compatible with a worker node's hardware setup (like GPU available 
+and capability). 
+
+The jobs that get executed are based on the job templates defined in the 
+[UFDL backend](https://github.com/waikato-ufdl/ufdl-backend). Executors are therefore 
+tightly coupled with the job-templates, as these reference the executor class 
+and required packages for running the executor.
+
+
+### Super classes
+
+The following super classes are available
+
+* `ufdl.joblauncher.AbstractJobExecutor` - ancestor for all executors
+* `ufdl.joblauncher.AbstractDockerJobExecutor` - for launching docker-image-based jobs
+
+
+### Implementations
+
+You can find executor implementations in the following repositories:
+
+* [ufdl-job-launcher-plugins](https://github.com/waikato-ufdl/ufdl-job-launcher-plugins)
