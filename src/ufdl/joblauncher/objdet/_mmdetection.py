@@ -35,7 +35,7 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
 
         # shared memory size
         try:
-            shm_size = self._parameter('shared_memory_size', job, template)['value']
+            shm_size = self._parameter('shared-memory-size', job, template)['value']
         except:
             shm_size = "8G"
         self._additional_gpu_flags.extend(["--shm-size", shm_size])
@@ -87,7 +87,7 @@ class ObjectDetectionTrain_MMDet_1_2(AbstractDockerJobExecutor):
         self._run_image(
             image,
             docker_args=[
-                "-e", "MMDET_CLASSES=/data/labels.txt",
+                "-e", "MMDET_CLASSES=/data/train/labels.txt",  # TODO
                 "-e", "MMDET_OUTPUT=/output/",
                 "-e", "MMDET_SETUP=/output/config.py",
                 "-e", "MMDET_DATA=/data"
