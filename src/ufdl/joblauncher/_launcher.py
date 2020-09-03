@@ -1,8 +1,7 @@
 import configparser
 import importlib
 import os
-import time
-from wai.lazypip import require_class
+from wai.lazypip import install_packages
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
 from ._logging import logger
@@ -56,7 +55,7 @@ def load_executor_class(class_name, required_packages):
     if required_packages is not None and (required_packages == ""):
         required_packages = None
     if required_packages is not None:
-        require_class(module_name, class_name, packages=required_packages.split(" "), pip_args=["--upgrade"])
+        install_packages(required_packages.split(" "), pip_args=["--upgrade"])
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
