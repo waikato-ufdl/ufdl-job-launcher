@@ -4,7 +4,7 @@ import os
 from wai.lazypip import install_packages
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
-from ._logging import logger, init_logger
+from ._logging import logger
 from ._node import get_ipv4
 from ._sleep import SleepSchedule
 from ufdl.joblauncher.poll import simple_poll
@@ -56,8 +56,11 @@ def load_executor_class(class_name, required_packages, debug=False):
         required_packages = None
     if required_packages is not None:
         install_packages(required_packages.split(" "), pip_args=["--upgrade"])
-        # reinitialize the logger
-        init_logger(debug=debug)
+        # TODO
+        print(logger())
+        print(logger().name)
+        print(logger().level)
+        print(logger().disabled)
 
     module = importlib.import_module(module_name)
     cls = getattr(module, cls_name)
