@@ -1,1 +1,0 @@
-from ._mmdetection import ObjectDetectionTrain_MMDet_1_2

@@ -37,11 +37,8 @@ setup(
     author_email='fracpete@waikato.ac.nz',
     install_requires=[
         "wai.lazypip",
-        "wai.annotations",
         "ufdl.pythonclient",
         "ufdl.json-messages",
-        "wai.lazypip",
-        "tensorflow",
         "psutil",
         "pyyaml",
     ],

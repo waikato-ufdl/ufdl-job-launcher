@@ -1,2 +1,0 @@
-from ._tensorflow import ImageClassificationTrain_TF_1_14
-from ._tensorflow import ImageClassificationPredict_TF_1_14

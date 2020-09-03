@@ -132,8 +132,6 @@ dmypy.json
 *~
 *.swp
 *.bak
-venv.test/
-blah.py
 .idea/
 *.iml
 test/
