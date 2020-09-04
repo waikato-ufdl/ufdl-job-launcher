@@ -472,6 +472,25 @@ class AbstractJobExecutor(object):
 
         return result
 
+    def _pk_from_joboutput(self, joboutput):
+        """
+        Determines PK from the job output string (PK|name|type).
+
+        :param joboutput: the joboutput string
+        :type joboutput: str
+        :return: the extracted PK, -1 if failed to determine
+        :rtype: int
+        """
+        try:
+            if "|" in joboutput:
+                result = int(joboutput[0:joboutput.index("|")])
+            else:
+                result = int(joboutput)
+        except:
+            self._log_msg("Failed to determine job ID from: %s\n%s" % (joboutput, traceback.format_exc()))
+            result = -1
+        return result
+
     def _any_present(self, files):
         """
         Checks whether at least one of the files listed is present in the file system.
