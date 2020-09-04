@@ -482,11 +482,8 @@ class AbstractJobExecutor(object):
         :rtype: int
         """
         try:
-            print("joboutput: '%s'" % joboutput)
             if "|" in joboutput:
-                sub = joboutput[0:joboutput.index("|")]
-                print("sub: '%s'" % sub)
-                result = int(sub)
+                result = int(joboutput[0:joboutput.index("|")])
             else:
                 result = int(joboutput)
         except:
