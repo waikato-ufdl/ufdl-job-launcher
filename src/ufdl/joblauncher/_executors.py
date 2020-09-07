@@ -408,9 +408,7 @@ class AbstractJobExecutor(object):
         result['name'] = name
         result['type'] = default['type']
         if supplied is None:
-            result['value'] = default['default']
-            if 'options' in default:
-                result['options'] = default['options']
+            raise Exception("Input '%s' not supplied!" % name)
         else:
             result['value'] = supplied
             result['options'] = default['options']
