@@ -21,6 +21,13 @@ Launcher framework for executing jobs in the UFDL framework.
   sudo apt-get install build-essential
   ```
 
+* additional libraries
+
+  ```commandline
+  sudo apt-get install virtualenv   
+  ```
+
+
 ## Scripts
 
 * `dev_init.sh` - sets up a development virtual environment
