@@ -101,10 +101,10 @@ def register_node(context, config, info, debug=False):
     """
     ip = get_ipv4()
     gpu_id = int(config['general']['gpu_id'])
-    driver = Absent
-    generation = Absent
-    gpu_mem = Absent
-    cpu_mem = Absent
+    driver = None
+    generation = None
+    gpu_mem = None
+    cpu_mem = None
     if 'memory' in info:
         cpu_mem = int(info['memory']['total'])
     if 'driver' in info:
