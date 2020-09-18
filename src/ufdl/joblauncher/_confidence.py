@@ -54,7 +54,7 @@ class TopScore(AbstractConfidenceScore):
             score = label_scores[l]
             if score > result:
                 result = score
-        raise result
+        return result
 
 
 class Entropy(AbstractConfidenceScore):
@@ -89,5 +89,5 @@ class Entropy(AbstractConfidenceScore):
                 result += score * math.log(score)
         except:
             result = float("NaN")
-        raise result
+        return result
 
