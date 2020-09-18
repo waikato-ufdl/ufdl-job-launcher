@@ -5,6 +5,7 @@ from wai.lazypip import install_packages
 from ufdl.pythonclient import UFDLServerContext
 from ._node import hardware_info
 from ._logging import logger
+from ._utils import load_class
 from ._node import get_ipv4
 from ._sleep import SleepSchedule
 from ufdl.joblauncher.poll import simple_poll
@@ -13,7 +14,6 @@ import ufdl.pythonclient.functional.core.nodes.node as node
 from ufdl.json.core.filter import FilterSpec
 from ufdl.json.core.filter.field import Exact
 from ufdl.json.core.filter.logical import And
-from wai.json.object import Absent
 from requests.exceptions import HTTPError
 
 
@@ -46,20 +46,20 @@ def load_executor_class(class_name, required_packages, debug=False):
     :type class_name: str
     :param required_packages: the required packages to install (in pip format, get split on space), ignored if None or empty string
     :type required_packages: str
+    :param debug: whether to output debugging information
+    :type debug: bool
     :return: the class object
     :rtype: class
     """
-    module_name = ".".join(class_name.split(".")[0:-1])
-    cls_name = class_name.split(".")[-1]
+    if debug:
+        logger().debug("Loading executor: %s - required packages: %s" % (class_name, required_packages))
 
     if required_packages is not None and (required_packages == ""):
         required_packages = None
     if required_packages is not None:
         install_packages(required_packages.split(" "), pip_args=["--upgrade"])
 
-    module = importlib.import_module(module_name)
-    cls = getattr(module, cls_name)
-    return cls
+    return load_class(class_name, debug=debug)
 
 
 def execute_job(context, config, job, debug=False):
