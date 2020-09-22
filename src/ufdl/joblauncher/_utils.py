@@ -21,5 +21,6 @@ def load_class(class_name, debug=False):
     cls_name = class_name.split(".")[-1]
 
     module = importlib.import_module(module_name)
+    importlib.reload(module)
     cls = getattr(module, cls_name)
     return cls
