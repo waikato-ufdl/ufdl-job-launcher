@@ -37,7 +37,7 @@ def create_server_context(config, debug=False):
         config['backend']['password'])
 
 
-def load_executor_class(class_name, required_packages, debug=False):
+def load_executor_class(class_name, required_packages, no_cache=True, debug=False):
     """
     Loads the executor class and returns it. Will install any required packages beforehand.
     Will fail with an exception if class cannot be loaded.
@@ -46,6 +46,8 @@ def load_executor_class(class_name, required_packages, debug=False):
     :type class_name: str
     :param required_packages: the required packages to install (in pip format, get split on space), ignored if None or empty string
     :type required_packages: str
+    :param no_cache: whether to turn of pip's cache
+    :type no_cache: bool
     :param debug: whether to output debugging information
     :type debug: bool
     :return: the class object
@@ -57,7 +59,10 @@ def load_executor_class(class_name, required_packages, debug=False):
     if required_packages is not None and (required_packages == ""):
         required_packages = None
     if required_packages is not None:
-        install_packages(required_packages.split(" "), pip_args=["--upgrade"])
+        pip_args = ["--upgrade"]
+        if no_cache:
+            pip_args.append("--no-cache-dir")
+        install_packages(required_packages.split(" "), pip_args=pip_args)
 
     return load_class(class_name, debug=debug)
 
@@ -79,7 +84,9 @@ def execute_job(context, config, job, debug=False):
         logger().debug("Job: %s" % str(job))
     template = jobtemplate_retrieve(context, job['template']['pk'])
 
-    cls = load_executor_class(template["executor_class"], template["required_packages"], debug=debug)
+    cls = load_executor_class(
+        template["executor_class"], template["required_packages"],
+        no_cache=config['general']['pip_no_cache'] == 'true', debug=debug)
     executor = cls(context, config)
     executor.run(template, job)
 
