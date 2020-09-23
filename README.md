@@ -30,7 +30,7 @@ Launcher framework for executing jobs in the UFDL framework.
 
 ## Scripts
 
-* `dev_init.sh` - sets up a development virtual environment
+* `dev_init.sh` - sets up a development virtual environment, use `-h` for outputting the help screen
 
 
 ## Tools
