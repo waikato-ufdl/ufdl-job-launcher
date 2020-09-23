@@ -451,7 +451,7 @@ class AbstractJobExecutor(object):
 
         return result
 
-    def _expand_template(self, job, template):
+    def _expand_template(self, job, template, bool_to_python=False):
         """
         Expands all parameters in the template code and returns the updated template string.
 
@@ -459,13 +459,21 @@ class AbstractJobExecutor(object):
         :type job: dict
         :param template: the template dictionary (for defaults)
         :type template: dict
+        :param bool_to_python: whether to convert boolean values true|false to Python's True|False
+        :param bool_to_python: bool
         :return: the expanded template
         :rtype: str
         """
         result = "".join(template["body"])
 
         for name in job['parameter_values']:
-            value = self._parameter(name, job, template)['value']
+            param = self._parameter(name, job, template)
+            value = param['value']
+            if bool_to_python and (param['type'] == 'bool'):
+                if value == 'true':
+                    value = 'True'
+                else:
+                    value = 'False'
             result = result.replace("${" + name + "}", value)
 
         return result
