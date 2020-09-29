@@ -212,6 +212,22 @@ class AbstractJobExecutor(object):
         if self.debug:
             logger().debug("\n".join(data['msg']))
 
+    def _log_file(self, msg, filename):
+        """
+        Reads the specified file and then logs the message and its content.
+
+        :param msg: the message to prepend the file content
+        :type msg: str
+        :param filename: the file to read
+        :type filename: str
+        """
+        try:
+            with open(filename, "r") as lf:
+                lines = lf.readlines()
+            self._log_msg("%s\n%s" % (msg, "".join(lines)))
+        except:
+            self._log_msg("Failed to read file: %s\n%s" % (filename, traceback.format_exc()))
+
     def _mktmpdir(self):
         """
         Creates a temp directory in the working directory and returns the absolute path.
