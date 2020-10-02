@@ -540,6 +540,25 @@ class AbstractJobExecutor(object):
 
         return result
 
+    def _upload(self, job_pk, output_name, output_type, localfile):
+        """
+        Uploads the specified file to the backend as job output.
+
+        :param job_pk: the PK of the job this output is for
+        :type job_pk: int
+        :param output_name: the job output name to use
+        :type output_name: str
+        :param output_type: the job output type to use (eg model, tensorboard, json)
+        :type output_type: str
+        :param localfile: the file to upload
+        :type localfile: str
+        """
+        try:
+            with open(localfile, "rb") as lf:
+                job_add_output(self.context, job_pk, output_name, output_type, lf)
+        except:
+            self._log_msg("Failed to upload file (%s/%s/%s) to backend:\n%s" % (output_name, output_type, localfile, traceback.format_exc()))
+
     def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strip_path=True):
         """
         Compresses the files as zip file and uploads them as job output under the specified name.
@@ -566,11 +585,7 @@ class AbstractJobExecutor(object):
             return
 
         self._compress(files, zipfile, strip_path=strip_path)
-        try:
-            with open(zipfile, "rb") as zf:
-                job_add_output(self.context, job_pk, output_name, output_type, zf)
-        except:
-            self._log_msg("Failed to upload zipfile (%s/%s/%s) to backend:\n%s" % (output_name, output_type, zipfile, traceback.format_exc()))
+        self._upload(job_pk, output_name, output_type, zipfile)
 
     def _pre_run(self, template, job):
         """
