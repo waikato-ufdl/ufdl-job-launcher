@@ -211,6 +211,14 @@ class AbstractJobExecutor(object):
         self._add_log(data)
         if self.debug:
             logger().debug("\n".join(data['msg']))
+        # write to disk
+        log = self.job_dir + "/log.json"
+        try:
+            with open(log, "w") as log_file:
+                json.dump(self._log, log_file, indent=2)
+        except:
+            logger().error("Failed to write log data to: %s" % log)
+            logger().error(traceback.format_exc())
 
     def _log_file(self, msg, filename):
         """
@@ -227,14 +235,6 @@ class AbstractJobExecutor(object):
             self._log_msg("%s\n%s" % (msg, "".join(lines)))
         except:
             self._log_msg("Failed to read file: %s\n%s" % (filename, traceback.format_exc()))
-        # write to disk
-        log = self.job_dir + "/log.json"
-        try:
-            with open(log, "w") as log_file:
-                json.dump(self._log, log_file, indent=2)
-        except:
-            logger().error("Failed to write log data to: %s" % log)
-            logger().error(traceback.format_exc())
 
     def _mktmpdir(self):
         """
