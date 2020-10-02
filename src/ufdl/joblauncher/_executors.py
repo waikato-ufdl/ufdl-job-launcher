@@ -557,7 +557,7 @@ class AbstractJobExecutor(object):
             with open(localfile, "rb") as lf:
                 job_add_output(self.context, job_pk, output_name, output_type, lf)
         except:
-            self._log_msg("Failed to upload file (%s/%s/%s) to backend:\n%s" % (output_name, output_type, localfile, traceback.format_exc()))
+            self._log_msg("Failed to upload file (%s|%s|%s) to backend:\n%s" % (output_name, output_type, localfile, traceback.format_exc()))
 
     def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strip_path=True):
         """
@@ -653,6 +653,9 @@ class AbstractJobExecutor(object):
         :type error: str
         """
 
+        # zip+upload log
+        self._compress_and_upload(int(job['pk']), "log", "json", [self.job_dir + "/log.json"], self.job_dir + "/log.zip")
+
         # finish job
         try:
             if error is None:
@@ -666,9 +669,6 @@ class AbstractJobExecutor(object):
             self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
         except:
             self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
-
-        # zip+upload log
-        self._compress_and_upload(int(job['pk']), "log", "json", [self.job_dir + "/log.json"], self.job_dir + "/log.zip")
 
         # clean up job dir
         if not self._debug:
