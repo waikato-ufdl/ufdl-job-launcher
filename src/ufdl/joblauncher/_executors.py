@@ -227,6 +227,14 @@ class AbstractJobExecutor(object):
             self._log_msg("%s\n%s" % (msg, "".join(lines)))
         except:
             self._log_msg("Failed to read file: %s\n%s" % (filename, traceback.format_exc()))
+        # write to disk
+        log = self.job_dir + "/log.json"
+        try:
+            with open(log, "w") as log_file:
+                json.dump(self._log, log_file, indent=2)
+        except:
+            logger().error("Failed to write log data to: %s" % log)
+            logger().error(traceback.format_exc())
 
     def _mktmpdir(self):
         """
@@ -628,18 +636,6 @@ class AbstractJobExecutor(object):
         :param error: any error that may have occurred, None if none occurred
         :type error: str
         """
-        log = self.job_dir + "/log.json"
-        try:
-            with open(self.job_dir + "/log.json", "w") as log_file:
-                json.dump(self._log, log_file, indent=2)
-            self._compress_and_upload(int(job['pk']), "log", "json", [log], self.job_dir + "/log.zip")
-        except:
-            logger().error("Failed to write log data to: %s" % log)
-            logger().error(traceback.format_exc())
-
-        if not self._debug:
-            self._rmdir(self.job_dir)
-        self._job_dir = None
 
         # finish job
         try:
@@ -654,6 +650,14 @@ class AbstractJobExecutor(object):
             self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
         except:
             self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
+
+        # zip+upload log
+        self._compress_and_upload(int(job['pk']), "log", "json", [self.job_dir + "/log.json"], self.job_dir + "/log.zip")
+
+        # clean up job dir
+        if not self._debug:
+            self._rmdir(self.job_dir)
+        self._job_dir = None
 
     def run(self, template, job):
         """
