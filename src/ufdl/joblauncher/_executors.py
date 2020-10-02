@@ -212,13 +212,14 @@ class AbstractJobExecutor(object):
         if self.debug:
             logger().debug("\n".join(data['msg']))
         # write to disk
-        log = self.job_dir + "/log.json"
-        try:
-            with open(log, "w") as log_file:
-                json.dump(self._log, log_file, indent=2)
-        except:
-            logger().error("Failed to write log data to: %s" % log)
-            logger().error(traceback.format_exc())
+        if self.job_dir is not None:
+            log = self.job_dir + "/log.json"
+            try:
+                with open(log, "w") as log_file:
+                    json.dump(self._log, log_file, indent=2)
+            except:
+                logger().error("Failed to write log data to: %s" % log)
+                logger().error(traceback.format_exc())
 
     def _log_file(self, msg, filename):
         """
