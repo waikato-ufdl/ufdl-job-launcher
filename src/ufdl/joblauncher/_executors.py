@@ -199,7 +199,7 @@ class AbstractJobExecutor(object):
                 result.append(arg)
         return result
 
-    def _log_msg(self, *args):
+    def log_msg(self, *args):
         """
         For logging debugging messages.
 
@@ -221,7 +221,7 @@ class AbstractJobExecutor(object):
                 logger().error("Failed to write log data to: %s" % log)
                 logger().error(traceback.format_exc())
 
-    def _log_file(self, msg, filename):
+    def log_file(self, msg, filename):
         """
         Reads the specified file and then logs the message and its content.
 
@@ -233,9 +233,9 @@ class AbstractJobExecutor(object):
         try:
             with open(filename, "r") as lf:
                 lines = lf.readlines()
-            self._log_msg("%s\n%s" % (msg, "".join(lines)))
+            self.log_msg("%s\n%s" % (msg, "".join(lines)))
         except:
-            self._log_msg("Failed to read file: %s\n%s" % (filename, traceback.format_exc()))
+            self.log_msg("Failed to read file: %s\n%s" % (filename, traceback.format_exc()))
 
     def _mktmpdir(self):
         """
@@ -253,7 +253,7 @@ class AbstractJobExecutor(object):
         :param directory: the directory to create
         :type directory: str
         """
-        self._log_msg("mkdir:", directory)
+        self.log_msg("mkdir:", directory)
         os.mkdir(directory)
 
     def _rmdir(self, directory):
@@ -263,7 +263,7 @@ class AbstractJobExecutor(object):
         :param directory: the directory to delete
         :type directory: str
         """
-        self._log_msg("rmdir:", directory)
+        self.log_msg("rmdir:", directory)
         shutil.rmtree(directory, ignore_errors=True)
 
     def _to_logentry(self, completed, hide):
@@ -332,7 +332,7 @@ class AbstractJobExecutor(object):
                     full.append("-S")
         full.extend(cmd)
 
-        self._log_msg("Executing:", " ".join(self._obscure(full, hide)))
+        self.log_msg("Executing:", " ".join(self._obscure(full, hide)))
 
         try:
             if stdin is not None:
@@ -367,7 +367,7 @@ class AbstractJobExecutor(object):
         :rtype: str
         """
 
-        self._log_msg("Compressing:", files, "->", zipfile)
+        self.log_msg("Compressing:", files, "->", zipfile)
 
         try:
             with ZipFile(zipfile, "w", compression=self._compression) as zf:
@@ -396,7 +396,7 @@ class AbstractJobExecutor(object):
         :type output_dir: str
         """
 
-        self._log_msg("Decompressing:", zipfile, "->", output_dir)
+        self.log_msg("Decompressing:", zipfile, "->", output_dir)
 
         try:
             with ZipFile(zipfile, "r") as zf:
@@ -518,7 +518,7 @@ class AbstractJobExecutor(object):
             else:
                 result = int(joboutput)
         except:
-            self._log_msg("Failed to determine job ID from: %s\n%s" % (joboutput, traceback.format_exc()))
+            self.log_msg("Failed to determine job ID from: %s\n%s" % (joboutput, traceback.format_exc()))
             result = -1
         return result
 
@@ -557,7 +557,7 @@ class AbstractJobExecutor(object):
             with open(localfile, "rb") as lf:
                 job_add_output(self.context, job_pk, output_name, output_type, lf)
         except:
-            self._log_msg("Failed to upload file (%s|%s|%s) to backend:\n%s" % (output_name, output_type, localfile, traceback.format_exc()))
+            self.log_msg("Failed to upload file (%s|%s|%s) to backend:\n%s" % (output_name, output_type, localfile, traceback.format_exc()))
 
     def _compress_and_upload(self, job_pk, output_name, output_type, files, zipfile, strip_path=True):
         """
@@ -577,11 +577,11 @@ class AbstractJobExecutor(object):
         :type strip_path: bool or str
         """
         if len(files) == 0:
-            self._log_msg("No files supplied, cannot generate zip file %s:" % zipfile)
+            self.log_msg("No files supplied, cannot generate zip file %s:" % zipfile)
             return
 
         if not self._any_present(files):
-            self._log_msg("None of the files are present, cannot generate zip file %s:" % zipfile, files)
+            self.log_msg("None of the files are present, cannot generate zip file %s:" % zipfile, files)
             return
 
         self._compress(files, zipfile, strip_path=strip_path)
@@ -598,11 +598,11 @@ class AbstractJobExecutor(object):
         :return: whether successful
         :rtype: bool
         """
-        self._log_msg("use_sudo=%s ask_sudo_pw=%s" % (str(self.use_sudo), str(self.ask_sudo_pw)))
+        self.log_msg("use_sudo=%s ask_sudo_pw=%s" % (str(self.use_sudo), str(self.ask_sudo_pw)))
 
         # jobdir
         self._job_dir = self._mktmpdir()
-        self._log_msg("Created jobdir:", self.job_dir)
+        self.log_msg("Created jobdir:", self.job_dir)
 
         # TODO retrieve notification type from user
         self._notification_type = "email"
@@ -611,19 +611,19 @@ class AbstractJobExecutor(object):
         try:
             acquire_job(self.context, job['pk'])
         except HTTPError as e:
-            self._log_msg("Failed to acquire job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
+            self.log_msg("Failed to acquire job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
             return
         except:
-            self._log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
+            self.log_msg("Failed to acquire job %d!\n%s" % (job['pk'], traceback.format_exc()))
             return False
         # start
         try:
             start_job(self.context, job['pk'], self.notification_type)
         except HTTPError as e:
-            self._log_msg("Failed to start job %d!\n%s\%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
+            self.log_msg("Failed to start job %d!\n%s\%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
             return False
         except:
-            self._log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
+            self.log_msg("Failed to start job %d!\n%s" % (job['pk'], traceback.format_exc()))
         return True
 
     def _do_run(self, template, job):
@@ -666,9 +666,9 @@ class AbstractJobExecutor(object):
                     error = "An error occurred during run, check log!"
             finish_job(self.context, job['pk'], pre_run_success and do_run_success, self.notification_type, error=error)
         except HTTPError as e:
-            self._log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
+            self.log_msg("Failed to finish job %d!\n%s\n%s" % (job['pk'], str(e.response.text), traceback.format_exc()))
         except:
-            self._log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
+            self.log_msg("Failed to finish job %d!\n%s" % (job['pk'], traceback.format_exc()))
 
         # clean up job dir
         if not self._debug:
@@ -692,7 +692,7 @@ class AbstractJobExecutor(object):
         except:
             pre_run_success = False
             error = "Failed to execute pre-run code:\n%s" % traceback.format_exc()
-            self._log_msg(error)
+            self.log_msg(error)
 
         if pre_run_success:
             try:
@@ -700,12 +700,12 @@ class AbstractJobExecutor(object):
                 do_run_success = True
             except:
                 error = "Failed to execute do-run code:\n%s" % traceback.format_exc()
-                self._log_msg(error)
+                self.log_msg(error)
 
         try:
             self._post_run(template, job, pre_run_success, do_run_success, error)
         except:
-            self._log_msg("Failed to execute post-run code:\n%s" % traceback.format_exc())
+            self.log_msg("Failed to execute post-run code:\n%s" % traceback.format_exc())
 
     def __str__(self):
         """
