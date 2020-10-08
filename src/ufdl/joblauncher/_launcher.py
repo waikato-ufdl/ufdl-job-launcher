@@ -163,10 +163,11 @@ def register_node(context, config, info, debug=False):
             ]
         )
         jobs = job_list(context, filter_spec=f)
+        logger().info("Found #%d jobs still registered for node." % len(jobs))
         if len(jobs) > 0:
-            logger().info("Found #%d jobs still registered for node, will reset." % len(jobs))
             for j in jobs:
                 try:
+                    logger().info("Resetting job #%d..." % j['pk'])
                     reset_job(context, j['pk'])
                 except:
                     logger().error("Failed to reset job #%d!" % j['pk'], exc_info=1)
