@@ -156,7 +156,7 @@ def register_node(context, config, info, debug=False):
         logger().info("Node PK %d" % pk)
 
         # any jobs currently still open? -> reset them
-        logger().info("Checking for jobs still registed to node %d" % pk)
+        logger().info("Checking for jobs still registered to node %d" % pk)
         f = FilterSpec(
             expressions=[
                     Exact(field="node", value=pk),
