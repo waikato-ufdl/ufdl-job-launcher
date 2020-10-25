@@ -11,6 +11,7 @@ from requests.exceptions import HTTPError
 from zipfile import ZipFile
 from ._logging import logger
 from ufdl.pythonclient import UFDLServerContext
+from ufdl.pythonclient.functional.core.nodes.node import list as list_nodes
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
 from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job
@@ -285,6 +286,15 @@ class AbstractJobExecutor(object):
             result['stderr'] = completed.stderr.decode().split("\n")
         result['returncode'] = completed.returncode
         return result
+
+    def _ping_backend(self):
+        """
+        Ensuring that the connection is still live.
+        """
+        try:
+            list_nodes(self.context)
+        except:
+            self.log_msg("Failed to ping backend:\n%s" % traceback.format_exc())
 
     def _execute_can_use_stdin(self, no_sudo=None):
         """
@@ -701,6 +711,7 @@ class AbstractJobExecutor(object):
 
         if pre_run_success:
             try:
+                self._ping_backend()  # make sure we still have a connection
                 self._do_run(template, job)
                 do_run_success = True
             except:
@@ -708,6 +719,7 @@ class AbstractJobExecutor(object):
                 self.log_msg(error)
 
         try:
+            self._ping_backend()  # make sure we still have a connection
             self._post_run(template, job, pre_run_success, do_run_success, error)
         except:
             self.log_msg("Failed to execute post-run code:\n%s" % traceback.format_exc())
