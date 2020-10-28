@@ -376,9 +376,9 @@ class AbstractJobExecutor(object):
                 error = "Failed to execute command:\n%s" % " ".join(completed.args)
                 error += "\nreturn code:\n%d" % completed.returncode
                 if completed.stdout is not None:
-                    error += "\nstdout:\n%s" % completed.stdout
+                    error += "\nstdout:\n%s" % completed.stdout.decode()
                 if completed.stderr is not None:
-                    error += "\nstderr:\n%s" % completed.stderr
+                    error += "\nstderr:\n%s" % completed.stderr.decode()
                 raise Exception(error)
 
     def _compress(self, files, zipfile, strip_path=None):
