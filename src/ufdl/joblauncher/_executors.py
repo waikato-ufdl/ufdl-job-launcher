@@ -362,7 +362,25 @@ class AbstractJobExecutor(object):
             return result
         else:
             return None
-        
+
+    def _fail_on_error(self, completed):
+        """
+        Raises an exception if the CompletedProcess object has a non-zero exit code.
+
+        :param completed: the CompletedProcess object to inspect
+        :type completed: CompletedProcess
+        :raises: Exception
+        """
+        if isinstance(completed, CompletedProcess):
+            if completed.returncode != 0:
+                error = "Failed to execute command:\n%s" % " ".join(completed.args)
+                error += "\nreturn code:\n%d" % completed.returncode
+                if completed.stdout is not None:
+                    error += "\nstdout:\n%s" % completed.stdout
+                if completed.stderr is not None:
+                    error += "\nstderr:\n%s" % completed.stderr
+                raise Exception(error)
+
     def _compress(self, files, zipfile, strip_path=None):
         """
         Compresses the files and stores them in the zip file.
@@ -962,7 +980,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
                 logger().fatal("Failed to log into registry")
                 raise Exception(self._to_logentry(res, [self._docker_image[KEY_REGISTRY_USERNAME], self._docker_image[KEY_REGISTRY_PASSWORD]]))
         self._use_gpu = not (str(self._docker_image[KEY_CPU]).lower() == "true")
-        self._pull_image(self._docker_image[KEY_IMAGE_URL])
+        self._fail_on_error(self._pull_image(self._docker_image[KEY_IMAGE_URL]))
         return True
 
     def _post_run(self, template, job, pre_run_success, do_run_success, error):
