@@ -486,6 +486,34 @@ class AbstractJobExecutor(object):
 
         return result
 
+    def _is_true(self, name, job, template):
+        """
+        Checks whether the boolean parameter is true.
+
+        :param job: the job dictionary
+        :type job: dict
+        :param template: the template dictionary (for defaults)
+        :type template: dict
+        :param name: the name of the parameter to retrieve
+        :return: the boolean value of the parameter
+        :rtype: bool
+        """
+        return self._parameter(name, job, template)['value'].lower() == "true"
+
+    def _is_false(self, name, job, template):
+        """
+        Checks whether the boolean parameter is false.
+
+        :param job: the job dictionary
+        :type job: dict
+        :param template: the template dictionary (for defaults)
+        :type template: dict
+        :param name: the name of the parameter to retrieve
+        :return: the boolean value of the parameter
+        :rtype: bool
+        """
+        return self._parameter(name, job, template)['value'].lower() == "false"
+
     def _expand_template(self, job, template, body=None, bool_to_python=False):
         """
         Expands all parameters in the template code and returns the updated template string.
