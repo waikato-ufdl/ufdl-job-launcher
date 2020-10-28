@@ -179,12 +179,11 @@ echo "Installing dependencies..."
 ./$VENV/bin/pip install --upgrade pip
 ./$VENV/bin/pip install --upgrade setuptools
 ./$VENV/bin/pip install Cython
-./$VENV/bin/pip install numpy
+./$VENV/bin/pip install wai.annotations
 ./$VENV/bin/pip install tensorflow
 ./$VENV/bin/pip install ../ufdl-json-messages
 ./$VENV/bin/pip install ../ufdl-python-client
 ./$VENV/bin/pip install wai.lazypip
-./$VENV/bin/pip install wai.annotations
 ./$VENV/bin/pip install psutil
 ./$VENV/bin/pip install pyyaml
 ./$VENV/bin/pip install .
