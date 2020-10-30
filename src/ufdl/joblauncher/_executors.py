@@ -661,19 +661,20 @@ class AbstractJobExecutor(object):
         :rtype: bool
         """
 
+        # TODO retrieve notification type from user
+        self._notification_type = "email"
+
         # basic info
         self.log_msg("IP:", get_ipv4())
         self.log_msg("Use sudo:", str(self.use_sudo))
         self.log_msg("Ask sudo password:", str(self.ask_sudo_pw))
+        self.log_msg("Notification:", self._notification_type)
         self.log_msg("Job:\n" + str(job))
         self.log_msg("Template:\n" + str(template))
 
         # jobdir
         self._job_dir = self._mktmpdir()
         self.log_msg("Created jobdir:", self.job_dir)
-
-        # TODO retrieve notification type from user
-        self._notification_type = "email"
 
         # acquire
         try:
