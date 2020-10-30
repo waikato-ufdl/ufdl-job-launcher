@@ -10,6 +10,7 @@ import traceback
 from requests.exceptions import HTTPError
 from zipfile import ZipFile
 from ._logging import logger
+from ._node import get_ipv4
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.node import list as list_nodes
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
@@ -659,7 +660,13 @@ class AbstractJobExecutor(object):
         :return: whether successful
         :rtype: bool
         """
-        self.log_msg("use_sudo=%s ask_sudo_pw=%s" % (str(self.use_sudo), str(self.ask_sudo_pw)))
+
+        # basic info
+        self.log_msg("IP:", get_ipv4())
+        self.log_msg("Use sudo:", str(self.use_sudo))
+        self.log_msg("Ask sudo password:", str(self.ask_sudo_pw))
+        self.log_msg("Job:\n" + str(job))
+        self.log_msg("Template:\n" + str(template))
 
         # jobdir
         self._job_dir = self._mktmpdir()
