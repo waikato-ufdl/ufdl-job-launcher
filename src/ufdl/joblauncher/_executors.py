@@ -412,8 +412,10 @@ class AbstractJobExecutor(object):
                     zf.write(f, arcname=arcname)
             return None
         except:
-            return "Failed to compress files '%s' into '%s':\n%s" \
+            msg = "Failed to compress files '%s' into '%s':\n%s" \
                    % (",".join(files), zipfile, traceback.format_exc())
+            self.log_msg(msg)
+            return msg
 
     def _decompress(self, zipfile, output_dir):
         """
