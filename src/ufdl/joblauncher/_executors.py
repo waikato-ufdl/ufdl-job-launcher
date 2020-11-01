@@ -646,8 +646,8 @@ class AbstractJobExecutor(object):
             self.log_msg("None of the files are present, cannot generate zip file %s:" % zipfile, files)
             return
 
-        self._compress(files, zipfile, strip_path=strip_path)
-        self._upload(job_pk, output_name, output_type, zipfile)
+        if self._compress(files, zipfile, strip_path=strip_path) is None:
+            self._upload(job_pk, output_name, output_type, zipfile)
 
     def _pre_run(self, template, job):
         """
