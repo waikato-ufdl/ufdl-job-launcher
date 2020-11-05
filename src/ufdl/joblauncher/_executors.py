@@ -12,7 +12,7 @@ from zipfile import ZipFile
 from ._logging import logger
 from ._node import get_ipv4
 from ufdl.pythonclient import UFDLServerContext
-from ufdl.pythonclient.functional.core.nodes.node import list as list_nodes
+from ufdl.pythonclient.functional.core.nodes.node import ping as node_ping
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
 from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job
@@ -293,7 +293,7 @@ class AbstractJobExecutor(object):
         Ensuring that the connection is still live.
         """
         try:
-            list_nodes(self.context)
+            node_ping(self.context)
         except:
             self.log_msg("Failed to ping backend:\n%s" % traceback.format_exc())
 
