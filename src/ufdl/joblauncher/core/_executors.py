@@ -523,7 +523,7 @@ class AbstractJobExecutor(object):
 
         return result
 
-    def _parameter(self, name, job=None, template=None):
+    def _parameter(self, name, job=None, template=None, allowed_types=None):
         """
         Returns the parameter description.
         Raises an exception if the template doesn't define it.
@@ -533,6 +533,8 @@ class AbstractJobExecutor(object):
         :param template: the template dictionary (for defaults)
         :type template: dict|None
         :param name: the name of the parameter to retrieve
+        :param allowed_types: a tuple of allowed types for the parameter
+        :type allowed_types: tuple|None
         :return: the dictionary with name, type, value
         :rtype: dict
         """
@@ -547,6 +549,13 @@ class AbstractJobExecutor(object):
                 break
         if default is None:
             raise Exception("Parameter '%s' not found in template!\n%s" % (name, str(template)))
+        if allowed_types is not None and default['type'] not in allowed_types:
+            raise Exception(
+                f"Parameter '{name}' is not one of the allowed types!\n"
+                f"Specified type is '{default['type']}'\n"
+                f"Allowed types are: {', '.join(allowed_types)}\n"
+                f"{template}"
+            )
         supplied = None
         if name in job['parameter_values']:
             supplied = job['parameter_values'][name]
