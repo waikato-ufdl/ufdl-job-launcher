@@ -1095,7 +1095,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
                 self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
             self._docker_image = None
 
-        super()._post_run(pre_run_success, do_run_success, error)
+        super()._post_run(template, job, pre_run_success, do_run_success, error)
 
     def can_run(self, job, template, hardware_info):
         """
