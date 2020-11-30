@@ -8,8 +8,8 @@ from ._logging import logger
 from ._utils import load_class
 from ._node import get_ipv4
 from ._sleep import SleepSchedule
-from ufdl.joblauncher.poll import simple_poll
-from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
+from .poll import simple_poll
+from ufdl.pythonclient.functional.core.jobs.workable_template import retrieve as jobtemplate_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import list as job_list
 from ufdl.pythonclient.functional.core.jobs.job import reset_job
 import ufdl.pythonclient.functional.core.nodes.node as node
@@ -69,7 +69,7 @@ def load_executor_class(class_name, required_packages, no_cache=True, debug=Fals
     return load_class(class_name, debug=debug)
 
 
-def execute_job(context, config, job, debug=False):
+def create_executor(context, config, job, debug=False):
     """
     Executes the given job.
 
@@ -81,6 +81,8 @@ def execute_job(context, config, job, debug=False):
     :type job: dict
     :param debug: whether to output debugging information
     :type debug: bool
+    :return: the job executor
+    :rtype: ufdl.joblauncher.AbstractJobExecutor
     """
     if debug:
         logger().debug("Job: %s" % str(job))
@@ -90,7 +92,9 @@ def execute_job(context, config, job, debug=False):
         template["executor_class"], template["required_packages"],
         no_cache=config['general']['pip_no_cache'] == 'true', debug=debug)
     executor = cls(context, config)
-    executor.run(template, job)
+    executor.job = job
+    executor.template = template
+    return executor
 
 
 def register_node(context, config, info, debug=False):
@@ -199,6 +203,34 @@ def create_dir(path, desc):
             exit(1)
 
 
+def get_next_job(poller, context, config, info, debug=False):
+    """
+    Uses the provided polling strategy to get the next job that
+    this node can run.
+
+    :param poller: the polling mechanism to use
+    :type poller: function
+    :param context: the UFDL server context
+    :type context: UFDLServerContext
+    :param config: the configuration to use
+    :type config: configparser.ConfigParser
+    :param info: the hardware info to use
+    :type info: dict
+    :param debug: whether to output debugging information
+    :type debug: bool
+    :return: the executor of the next job to run.
+    :rtype: ufdl.joblauncher.AbstractJobExecutor
+    """
+    def prepare_job(job):
+        executor = create_executor(context, config, job, debug)
+        if executor.can_run(executor.job, executor.template, info):
+            return executor
+        else:
+            return None
+
+    return poller(context, config, prepare_job, debug)
+
+
 def launch_jobs(config, continuous, debug=False):
     """
     Launches the jobs.
@@ -236,14 +268,15 @@ def launch_jobs(config, continuous, debug=False):
 
     while True:
         try:
-            job = None
+            poller = None
             if poll == "simple":
-                job = simple_poll(context, config, info, debug=debug)
+                poller = simple_poll
             else:
                 logger().fatal("Unknown poll method: %s" % poll)
                 exit(1)
-            if job is not None:
-                execute_job(context, config, job, debug=debug)
+            executor = get_next_job(poller, context, config, info, debug=debug)
+            if executor is not None:
+                executor.run()
                 sleep.reset()
         except KeyboardInterrupt:
             logger().error("Polling/execution interrupted!", exc_info=1)

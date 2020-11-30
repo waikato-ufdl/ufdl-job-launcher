@@ -13,7 +13,9 @@ from ._logging import logger
 from ._node import get_ipv4
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.node import ping as node_ping
+from ufdl.pythonclient.functional.core.nodes.cuda import retrieve as cuda_retrieve
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
+from ufdl.pythonclient.functional.core.nodes.hardware import retrieve as hardware_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
 from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job
 from wai.json.object import Absent
@@ -29,6 +31,8 @@ KEY_REGISTRY_USERNAME = 'registry_username'
 KEY_REGISTRY_URL = 'registry_url'
 
 KEY_DOCKER_IMAGE = "docker_image"
+
+DOCKER_IMAGE_TYPE = "pk<docker_image>"
 
 
 class AbstractJobExecutor(object):
@@ -55,6 +59,8 @@ class AbstractJobExecutor(object):
         self._log = list()
         self._compression = int(config['general']['compression'])
         self._notification_type = None
+        self._template = None
+        self._job = None
 
     @property
     def debug(self):
@@ -165,6 +171,46 @@ class AbstractJobExecutor(object):
         :rtype: str
         """
         return self._notification_type
+
+    @property
+    def job(self):
+        """
+        Returns the job of this executor.
+
+        :return: the job
+        :rtype: dict
+        """
+        return self._job
+
+    @job.setter
+    def job(self, value):
+        """
+        Sets the job of this executor.
+
+        :param value: the job
+        :type value: dict
+        """
+        self._job = value
+
+    @property
+    def template(self):
+        """
+        Returns the template of this executor.
+
+        :return: the template
+        :rtype: dict
+        """
+        return self._template
+
+    @template.setter
+    def template(self, value):
+        """
+        Sets the template of this executor.
+
+        :param value: the template
+        :type value: dict
+        """
+        self._template = value
 
     def _add_log(self, data):
         """
@@ -436,19 +482,23 @@ class AbstractJobExecutor(object):
             return "Failed to decompress '%s' to '%s':\n%s" \
                    % (zipfile, output_dir, traceback.format_exc())
 
-    def _input(self, name, job, template):
+    def _input(self, name, job=None, template=None):
         """
         Returns the input variable description.
         Raises an exception if the template doesn't define it.
 
         :param job: the job dictionary
-        :type job: dict
+        :type job: dict|None
         :param template: the template dictionary (for defaults)
-        :type template: dict
+        :type template: dict|None
         :param name: the name of the input to retrieve
         :return: the dictionary with name, type, value
         :rtype: dict
         """
+        if job is None:
+            job = self._job
+        if template is None:
+            template = self._template
         default = None
         for _input in template['inputs']:
             if _input['name'] == name:
@@ -462,30 +512,34 @@ class AbstractJobExecutor(object):
 
         result = dict()
         result['name'] = name
-        result['type'] = default['type']
         if supplied is None:
             raise Exception("Input '%s' not supplied!" % name)
         else:
-            result['value'] = supplied
+            result['type'] = supplied['type']
+            result['value'] = supplied['value']
             result['options'] = default['options']
         if 'options' not in result:
             result['options'] = ''
 
         return result
 
-    def _parameter(self, name, job, template):
+    def _parameter(self, name, job=None, template=None):
         """
         Returns the parameter description.
         Raises an exception if the template doesn't define it.
 
         :param job: the job dictionary
-        :type job: dict
+        :type job: dict|None
         :param template: the template dictionary (for defaults)
-        :type template: dict
+        :type template: dict|None
         :param name: the name of the parameter to retrieve
         :return: the dictionary with name, type, value
         :rtype: dict
         """
+        if job is None:
+            job = self._job
+        if template is None:
+            template = self._template
         default = None
         for param in template['parameters']:
             if param['name'] == name:
@@ -507,42 +561,42 @@ class AbstractJobExecutor(object):
 
         return result
 
-    def _is_true(self, name, job, template):
+    def _is_true(self, name, job=None, template=None):
         """
         Checks whether the boolean parameter is true.
 
         :param job: the job dictionary
-        :type job: dict
+        :type job: dict|None
         :param template: the template dictionary (for defaults)
-        :type template: dict
+        :type template: dict|None
         :param name: the name of the parameter to retrieve
         :return: the boolean value of the parameter
         :rtype: bool
         """
         return self._parameter(name, job, template)['value'].lower() == "true"
 
-    def _is_false(self, name, job, template):
+    def _is_false(self, name, job=None, template=None):
         """
         Checks whether the boolean parameter is false.
 
         :param job: the job dictionary
-        :type job: dict
+        :type job: dict|None
         :param template: the template dictionary (for defaults)
-        :type template: dict
+        :type template: dict|None
         :param name: the name of the parameter to retrieve
         :return: the boolean value of the parameter
         :rtype: bool
         """
         return self._parameter(name, job, template)['value'].lower() == "false"
 
-    def _expand_template(self, job, template, body=None, bool_to_python=False):
+    def _expand_template(self, job=None, template=None, body=None, bool_to_python=False):
         """
         Expands all parameters in the template code and returns the updated template string.
 
         :param job: the job dictionary
-        :type job: dict
+        :type job: dict|None
         :param template: the template dictionary (for defaults)
-        :type template: dict
+        :type template: dict|None
         :param body: the template body to expand, if None, use the "body" value from the template
         :type body: str
         :param bool_to_python: whether to convert boolean values true|false to Python's True|False
@@ -550,6 +604,10 @@ class AbstractJobExecutor(object):
         :return: the expanded template
         :rtype: str
         """
+        if job is None:
+            job = self._job
+        if template is None:
+            template = self._template
         if body is None:
             result = "".join(template["body"])
         else:
@@ -662,7 +720,6 @@ class AbstractJobExecutor(object):
         :return: whether successful
         :rtype: bool
         """
-
         # TODO retrieve notification type from user
         self._notification_type = "email"
 
@@ -746,16 +803,35 @@ class AbstractJobExecutor(object):
             self._rmdir(self.job_dir)
         self._job_dir = None
 
-    def run(self, template, job):
+    def can_run(self, job, template, hardware_info):
+        """
+        Checks if this job-executor is capable of running on the current node.
+
+        :param template: the job template that was applied
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        :param hardware_info: the hardware info to use
+        :type hardware_info: dict
+        :return: True if the job can run on this node, False if not.
+        :rtype: bool
+        """
+        return True
+
+    def run(self, template=None, job=None):
         """
         Applies the template and executes the job. Raises an exception if it fails.
 
         :param template: the job template to apply
-        :type template: dict
+        :type template: dict|None
         :param job: the job with the actual values for inputs and parameters
-        :type job: dict
+        :type job: dict|None
         :return:
         """
+        if job is None:
+            job = self._job
+        if template is None:
+            template = self._template
         error = None
         do_run_success = False
         try:
@@ -978,9 +1054,6 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             return False
 
         # docker image
-        if KEY_DOCKER_IMAGE not in job:
-            raise Exception("Docker image PK not defined in job (key: %s)!\n%s" % (KEY_DOCKER_IMAGE, str(job)))
-        self._docker_image = docker_retrieve(self.context, int(job[KEY_DOCKER_IMAGE]['pk']))
         if self._registry_login_required():
             res = self._login_registry(
                 self._docker_image[KEY_REGISTRY_URL],
@@ -1013,4 +1086,51 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
                 self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
             self._docker_image = None
 
-        super()._post_run(template, job, pre_run_success, do_run_success, error)
+        super()._post_run(pre_run_success, do_run_success, error)
+
+    def can_run(self, job, template, hardware_info):
+        """
+        Checks if this job-executor is capable of running on the current node.
+
+        :param template: the job template that was applied
+        :type template: dict
+        :param job: the job with the actual values for inputs and parameters
+        :type job: dict
+        :param hardware_info: the hardware info to use
+        :type hardware_info: dict
+        :return: True if the job can run on this node, False if not.
+        :rtype: bool
+        """
+        # Check any super-conditions
+        if not super().can_run(job, template, hardware_info):
+            return False
+
+        # Get the value of the docker parameter
+        docker_image_parameter_value = self._parameter(KEY_DOCKER_IMAGE)
+        if docker_image_parameter_value['type'] != DOCKER_IMAGE_TYPE:
+            raise Exception("Docker image parameter '%s' must be of type %s" % (KEY_DOCKER_IMAGE, DOCKER_IMAGE_TYPE))
+
+        # Get the docker image
+        self._docker_image = docker_retrieve(self.context, int(docker_image_parameter_value['value']))
+
+        # If we have no GPU, the image must be CPU-runnable
+        if 'gpus' not in hardware_info:
+            return self._docker_image['cpu']
+
+        # Get the information about the CUDA version in the Docker image
+        cuda = cuda_retrieve(self.context, self._docker_image['cuda_version'])
+
+        # Make sure the node supports the CUDA version and driver version
+        if cuda['version'] > hardware_info["cuda"]:
+            return False
+        elif cuda['min_driver_version'] > hardware_info["driver"]:
+            return False
+
+        # Get the minimum hardware generation required by the Docker image
+        min_hardware_generation = hardware_retrieve(self.context, self._docker_image['min_hardware_generation'])
+
+        # Make sure our hardware is up-to-date
+        if min_hardware_generation['min_compute_capability'] > hardware_info["gpus"][0]["compute"]:
+            return False
+
+        return True
