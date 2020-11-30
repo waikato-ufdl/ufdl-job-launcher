@@ -223,10 +223,15 @@ def get_next_job(poller, context, config, info, debug=False):
     """
     def prepare_job(job):
         executor = create_executor(context, config, job, debug)
-        if executor.can_run(executor.job, executor.template, info):
-            return executor
-        else:
+        cant_run_reason = executor.can_run(executor.job, executor.template, info)
+        if cant_run_reason is not None:
+            if debug:
+                logger().debug(
+                    f"Can't run job {executor.job['pk']} with template {executor.template['pk']}\n"
+                    f"{cant_run_reason}"
+                )
             return None
+        return executor
 
     return poller(context, config, prepare_job, debug)
 

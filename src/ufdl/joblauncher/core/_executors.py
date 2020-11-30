@@ -822,10 +822,10 @@ class AbstractJobExecutor(object):
         :type job: dict
         :param hardware_info: the hardware info to use
         :type hardware_info: dict
-        :return: True if the job can run on this node, False if not.
-        :rtype: bool
+        :return: The reason the job can't be run, or None if it can.
+        :rtype: str|None
         """
-        return True
+        return None
 
     def run(self, template=None, job=None):
         """
@@ -1107,39 +1107,52 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :type job: dict
         :param hardware_info: the hardware info to use
         :type hardware_info: dict
-        :return: True if the job can run on this node, False if not.
-        :rtype: bool
+        :return: The reason the job can't be run, or None if it can.
+        :rtype: str|None
         """
         # Check any super-conditions
-        if not super().can_run(job, template, hardware_info):
-            return False
+        super_reason = super().can_run(job, template, hardware_info)
+        if super_reason is not None:
+            return super_reason
 
         # Get the value of the docker parameter
-        docker_image_parameter_value = self._parameter(KEY_DOCKER_IMAGE)
-        if docker_image_parameter_value['type'] != DOCKER_IMAGE_TYPE:
-            raise Exception("Docker image parameter '%s' must be of type %s" % (KEY_DOCKER_IMAGE, DOCKER_IMAGE_TYPE))
+        docker_image_parameter_value = self._parameter(KEY_DOCKER_IMAGE, allowed_types=(DOCKER_IMAGE_TYPE,))
 
         # Get the docker image
         self._docker_image = docker_retrieve(self.context, int(docker_image_parameter_value['value']))
 
-        # If we have no GPU, the image must be CPU-runnable
-        if 'gpus' not in hardware_info:
-            return self._docker_image['cpu']
+        # If we have no GPU or compatible software, the image must be CPU-runnable
+        no_gpu_reason = (
+            f"Node has no CUDA version"
+            if 'cuda' not in hardware_info else
+            f"Node has no driver version"
+            if 'driver' not in hardware_info else
+            f"Node has no GPUs"
+            if 'gpus' not in hardware_info or len(hardware_info['gpus']) == 0 else
+            f"Node GPU has no compute capability"
+            if 'compute' not in hardware_info["gpus"][0] else
+            None
+        )
+        if no_gpu_reason is not None:
+            if not self._docker_image['cpu']:
+                return no_gpu_reason + " and Docker image is not CPU-only"
+            else:
+                return None
 
         # Get the information about the CUDA version in the Docker image
         cuda = cuda_retrieve(self.context, self._docker_image['cuda_version'])
 
         # Make sure the node supports the CUDA version and driver version
         if cuda['version'] > hardware_info["cuda"]:
-            return False
+            return f"Node's CUDA version ({hardware_info['cuda']}) is too low for Docker image (requires >= {cuda['version']})"
         elif cuda['min_driver_version'] > hardware_info["driver"]:
-            return False
+            return f"Node's driver version ({hardware_info['driver']}) is too low for Docker image (requires >= {cuda['min_driver_version']})"
 
         # Get the minimum hardware generation required by the Docker image
         min_hardware_generation = hardware_retrieve(self.context, self._docker_image['min_hardware_generation'])
 
         # Make sure our hardware is up-to-date
         if min_hardware_generation['min_compute_capability'] > hardware_info["gpus"][0]["compute"]:
-            return False
+            return f"Node's GPU compute capability ({hardware_info['gpus'][0]['compute']}) is too low for Docker image (requires >= {min_hardware_generation['min_compute_capability']})"
 
         return True
