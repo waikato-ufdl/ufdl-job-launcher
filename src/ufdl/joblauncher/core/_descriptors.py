@@ -2,6 +2,7 @@
 Descriptor classes for declarative-style handling of inputs/parameters.
 """
 from typing import Dict, Any, Callable, Tuple, Iterator, Type, Union
+from weakref import WeakKeyDictionary
 
 from ufdl.pythonclient.functional.core.jobs import job, job_output
 
@@ -91,8 +92,7 @@ class Input:
                 handler
             for type_string, handler in type_handlers.items()
         }
-        self._value: Any = None
-        self._cached: bool = False
+        self._cache = WeakKeyDictionary()
 
     def __get__(self, instance, owner: type):
         # If called from the class, return the descriptor itself
@@ -104,8 +104,8 @@ class Input:
             raise Exception(f"{Input.__qualname__} not bound")
 
         # Return the cached result if any
-        if self._cached:
-            return self._value
+        if instance in self._cache:
+            return self._cache[instance]
 
         # Get the input value description from the instance
         input = instance._input(self._name)
@@ -114,10 +114,10 @@ class Input:
         type_handler = self._type_handlers[input['type']]
 
         # Process and cache the value
-        self._value = type_handler(instance, input['value'], input['options'])
-        self._cached = True
+        value = type_handler(instance, input['value'], input['options'])
+        self._cache[instance] = value
 
-        return self._value
+        return value
 
     def __set_name__(self, owner: type, name: str):
         # Local import to avoid circular dependency
@@ -152,8 +152,7 @@ class Parameter:
         self._name: str = None
         self._type_handlers: Dict[str, ParameterTypeHandler] = type_handlers.copy()
         self._allowed_types: Tuple[str] = tuple(type_handlers.keys())
-        self._value: Any = None
-        self._cached: bool = False
+        self._cache = WeakKeyDictionary()
 
     def __get__(self, instance, owner: type):
         # If called from the class, return the descriptor itself
@@ -165,8 +164,8 @@ class Parameter:
             raise Exception(f"{Parameter.__qualname__} not bound")
 
         # Return the cached result if any
-        if self._cached:
-            return self._value
+        if instance in self._cache:
+            return self._cache[instance]
 
         # Get the input value description from the instance
         parameter = instance._parameter(self._name, allowed_types=self._allowed_types)
@@ -175,10 +174,10 @@ class Parameter:
         type_handler = self._type_handlers[parameter['type']]
 
         # Process and cache the value
-        self._value = type_handler(instance, parameter['value'])
-        self._cached = True
+        value = type_handler(instance, parameter['value'])
+        self._cache[instance] = value
 
-        return self._value
+        return value
 
     def __set_name__(self, owner: type, name: str):
         # Local import to avoid circular dependency
