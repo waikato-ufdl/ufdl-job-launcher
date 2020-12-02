@@ -1122,12 +1122,12 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
 
         # If we have no GPU or compatible software, the image must be CPU-runnable
         no_gpu_reason = (
-            f"Node has no CUDA version"
-            if 'cuda' not in hardware_info else
-            f"Node has no driver version"
-            if 'driver' not in hardware_info else
             f"Node has no GPUs"
             if 'gpus' not in hardware_info or len(hardware_info['gpus']) == 0 else
+            f"Node has no GPU driver"
+            if 'driver' not in hardware_info else
+            f"Node has no CUDA version"
+            if 'cuda' not in hardware_info else
             f"Node GPU has no compute capability"
             if 'compute' not in hardware_info["gpus"][0] else
             None
