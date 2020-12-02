@@ -89,7 +89,7 @@ class Input:
                 handler(type_string)
                 if handler is JobOutput else
                 handler
-            for type_string, handler in type_handlers
+            for type_string, handler in type_handlers.items()
         }
         self._value: Any = None
         self._cached: bool = False
