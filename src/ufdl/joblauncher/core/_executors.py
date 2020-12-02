@@ -9,6 +9,7 @@ import tempfile
 import traceback
 from requests.exceptions import HTTPError
 from zipfile import ZipFile
+from ._descriptors import Parameter
 from ._logging import logger
 from ._node import get_ipv4
 from ufdl.pythonclient import UFDLServerContext
@@ -879,6 +880,11 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
     """
     For executing jobs via docker images.
     """
+    # The docker image to execute the job
+    docker_image = Parameter({
+        DOCKER_IMAGE_TYPE:
+            lambda self, value: docker_retrieve(self.context, int(value))
+    })
 
     def __init__(self, context, config):
         """
@@ -893,7 +899,6 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         self._use_current_user = (config['docker']['use_current_user'] == "true")
         self._use_gpu = False
         self._gpu_id = int(config['general']['gpu_id'])
-        self._docker_image = None
         self._additional_gpu_flags = []
 
     @property
@@ -972,8 +977,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :return: True if necessary to log in
         :rtype: bool
         """
-        return (self._docker_image[KEY_REGISTRY_USERNAME] is not None) \
-               and (self._docker_image[KEY_REGISTRY_USERNAME] != "")
+        return (self.docker_image[KEY_REGISTRY_USERNAME] is not None) \
+               and (self.docker_image[KEY_REGISTRY_USERNAME] != "")
 
     def _login_registry(self, registry, user, password):
         """
@@ -1065,14 +1070,14 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         # docker image
         if self._registry_login_required():
             res = self._login_registry(
-                self._docker_image[KEY_REGISTRY_URL],
-                self._docker_image[KEY_REGISTRY_USERNAME],
-                self._docker_image[KEY_REGISTRY_PASSWORD])
+                self.docker_image[KEY_REGISTRY_URL],
+                self.docker_image[KEY_REGISTRY_USERNAME],
+                self.docker_image[KEY_REGISTRY_PASSWORD])
             if res is not None:
                 logger().fatal("Failed to log into registry")
-                raise Exception(self._to_logentry(res, [self._docker_image[KEY_REGISTRY_USERNAME], self._docker_image[KEY_REGISTRY_PASSWORD]]))
-        self._use_gpu = not (str(self._docker_image[KEY_CPU]).lower() == "true")
-        self._fail_on_error(self._pull_image(self._docker_image[KEY_IMAGE_URL]))
+                raise Exception(self._to_logentry(res, [self.docker_image[KEY_REGISTRY_USERNAME], self._docker_image[KEY_REGISTRY_PASSWORD]]))
+        self._use_gpu = not (str(self.docker_image[KEY_CPU]).lower() == "true")
+        self._fail_on_error(self._pull_image(self.docker_image[KEY_IMAGE_URL]))
         return True
 
     def _post_run(self, template, job, pre_run_success, do_run_success, error):
@@ -1090,10 +1095,10 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         :param error: any error that may have occurred, None if none occurred
         :type error: str
         """
-        if self._docker_image is not None:
+        if self.docker_image is not None:
             if self._registry_login_required():
-                self._logout_registry(self._docker_image[KEY_REGISTRY_URL])
-            self._docker_image = None
+                self._logout_registry(self.docker_image[KEY_REGISTRY_URL])
+            #self.docker_image = None
 
         super()._post_run(template, job, pre_run_success, do_run_success, error)
 
@@ -1115,12 +1120,6 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         if super_reason is not None:
             return super_reason
 
-        # Get the value of the docker parameter
-        docker_image_parameter_value = self._parameter(KEY_DOCKER_IMAGE, allowed_types=(DOCKER_IMAGE_TYPE,))
-
-        # Get the docker image
-        self._docker_image = docker_retrieve(self.context, int(docker_image_parameter_value['value']))
-
         # If we have no GPU or compatible software, the image must be CPU-runnable
         no_gpu_reason = (
             f"Node has no CUDA version"
@@ -1134,13 +1133,13 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             None
         )
         if no_gpu_reason is not None:
-            if not self._docker_image['cpu']:
+            if not self.docker_image['cpu']:
                 return no_gpu_reason + " and Docker image is not CPU-only"
             else:
                 return None
 
         # Get the information about the CUDA version in the Docker image
-        cuda = cuda_retrieve(self.context, self._docker_image['cuda_version'])
+        cuda = cuda_retrieve(self.context, self.docker_image['cuda_version'])
 
         # Make sure the node supports the CUDA version and driver version
         if cuda['version'] > hardware_info["cuda"]:
@@ -1149,7 +1148,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             return f"Node's driver version ({hardware_info['driver']}) is too low for Docker image (requires >= {cuda['min_driver_version']})"
 
         # Get the minimum hardware generation required by the Docker image
-        min_hardware_generation = hardware_retrieve(self.context, self._docker_image['min_hardware_generation'])
+        min_hardware_generation = hardware_retrieve(self.context, self.docker_image['min_hardware_generation'])
 
         # Make sure our hardware is up-to-date
         if min_hardware_generation['min_compute_capability'] > hardware_info["gpus"][0]["compute"]:
