@@ -1154,4 +1154,4 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         if min_hardware_generation['min_compute_capability'] > hardware_info["gpus"][0]["compute"]:
             return f"Node's GPU compute capability ({hardware_info['gpus'][0]['compute']}) is too low for Docker image (requires >= {min_hardware_generation['min_compute_capability']})"
 
-        return True
+        return None
