@@ -623,7 +623,8 @@ class AbstractJobExecutor(object):
         else:
             result = body
 
-        for name in job['parameter_values']:
+        for parameter in template['parameters']:
+            name = parameter['name']
             param = self._parameter(name, job, template)
             value = param['value']
             if bool_to_python and (param['type'] == 'bool'):
