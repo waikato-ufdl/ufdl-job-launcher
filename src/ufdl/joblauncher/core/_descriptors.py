@@ -34,11 +34,8 @@ class JobOutput:
         """
         The name of the job-output that supplied this value.
         """
-        # Retrieve and cache the serialised job-output description
-        if self._serialised is None:
-            self._serialised = job_output.retrieve(self._owner.context, self._pk)
 
-        return self._serialised['name']
+        return self.serialised['name']
 
     @property
     def type(self) -> str:
@@ -55,6 +52,13 @@ class JobOutput:
         return self._pk
 
     @property
+    def job_pk(self) -> int:
+        """
+        The primary key of the job owning this output.
+        """
+        return int(self.serialised['job'])
+
+    @property
     def options(self) -> str:
         """
         The options of the input that sourced this value.
@@ -68,7 +72,20 @@ class JobOutput:
         :return:
                     An iterator of byte-chunks of the output as it downloads.
         """
-        return job.get_output(self._owner.context, self._pk, self.name, self._type)
+        return job.get_output(self._owner.context, self.job_pk, self.name, self._type)
+
+    @property
+    def serialised(self):
+        self._ensure_serialised()
+        return self._serialised
+
+    def _ensure_serialised(self):
+        """
+        Ensures the serialised description of the job output has been retrieved.
+        """
+        # Retrieve and cache the serialised job-output description
+        if self._serialised is None:
+            self._serialised = job_output.retrieve(self._owner.context, self._pk)
 
 
 class Input:
