@@ -18,7 +18,7 @@ from ufdl.pythonclient.functional.core.nodes.cuda import retrieve as cuda_retrie
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 from ufdl.pythonclient.functional.core.nodes.hardware import retrieve as hardware_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
-from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job
+from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job, progress_job
 from wai.json.object import Absent
 
 KEY_CPU = 'cpu'
@@ -672,6 +672,22 @@ class AbstractJobExecutor(object):
                 break
 
         return result
+
+    def _progress(self, job_pk, progress, **data):
+        """
+        Updates the server on the progress of the job.
+
+        :param job_pk: the PK of the job this output is for
+        :type job_pk: int
+        :param progress: the progress amount in [0.0, 1.0]
+        :type progress: float
+        :param data: other JSON meta-data about the progress
+        :type data: RawJSONElement
+        """
+        try:
+            progress_job(self.context, job_pk, progress, **data)
+        except:
+            self.log_msg("Failed to update backend on progress to backend:\n%s" % (traceback.format_exc()))
 
     def _upload(self, job_pk, output_name, output_type, localfile):
         """
