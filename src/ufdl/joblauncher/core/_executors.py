@@ -329,9 +329,19 @@ class AbstractJobExecutor(object):
         result = dict()
         result['cmd'] = self._obscure(completed.args, hide)
         if completed.stdout is not None:
-            result['stdout'] = completed.stdout.decode().split("\n")
-        if completed.stdout is not None:
-            result['stderr'] = completed.stderr.decode().split("\n")
+            if isinstance(completed.stdout, str):
+                result['stdout'] = completed.stdout.split("\n")
+            elif isinstance(completed.stdout, list):
+                result['stdout'] = completed.stdout[:]
+            else:
+                result['stdout'] = completed.stdout.decode().split("\n")
+        if completed.stderr is not None:
+            if isinstance(completed.stderr, str):
+                result['stderr'] = completed.stderr.split("\n")
+            elif isinstance(completed.stderr, list):
+                result['stderr'] = completed.stderr[:]
+            else:
+                result['stderr'] = completed.stderr.decode().split("\n")
         result['returncode'] = completed.returncode
         return result
 
@@ -357,9 +367,11 @@ class AbstractJobExecutor(object):
                     return False
         return True
 
-    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=True, stdin=None, hide=None):
+    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=True, stdin=None, hide=None, command_progress_parser=None, job=None):
         """
         Executes the command.
+        For updating a job's progress, a progress parser method can be supplied. For a dummy implemented and
+        explanation of parameters see: dummy_command_progress_parser
 
         :param cmd: the command as list of strings
         :type cmd: list
@@ -374,6 +386,10 @@ class AbstractJobExecutor(object):
         :type stdin: str
         :param hide: the list of strings to obscure in the log message
         :type hide: list
+        :param command_progress_parser: the parser for the command output for updating the progress in the backend
+        :type command_progress_parser: object
+        :param job: the job for which to post progress updates
+        :type job: dict
         :return: the CompletedProcess object from executing the command, uses 255 as return code in case of an
                  exception and stores the stack trace in stderr
         :rtype: subprocess.CompletedProcess
@@ -400,7 +416,23 @@ class AbstractJobExecutor(object):
                 stdout, stderr = process.communicate(input=stdin.encode())
                 result = CompletedProcess(full, process.returncode, stdout=stdout, stderr=stderr)
             else:
-                result = subprocess.run(full, capture_output=capture_output)
+                stdout_list = []
+                process = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, bufsize=1)
+                last_progress = 0.0
+                while True:
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    if capture_output:
+                        stdout_list.append(line)
+                    if capture_output and (job is not None) and (command_progress_parser is not None):
+                        try:
+                            last_progress = command_progress_parser(self, job, line, last_progress)
+                        except:
+                            command_progress_parser = None
+                            self.log_msg("Failed to parse progress output, disabling!", traceback.format_exc())
+                retcode = process.wait()
+                result = CompletedProcess(full, retcode, stdout=stdout_list, stderr=None)
         except:
             result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
 
@@ -673,7 +705,7 @@ class AbstractJobExecutor(object):
 
         return result
 
-    def _progress(self, job_pk, progress, **data):
+    def progress(self, job_pk, progress, **data):
         """
         Updates the server on the progress of the job.
 
@@ -684,6 +716,7 @@ class AbstractJobExecutor(object):
         :param data: other JSON meta-data about the progress
         :type data: RawJSONElement
         """
+        # TODO make public
         try:
             progress_job(self.context, job_pk, progress, **data)
         except:
@@ -1037,9 +1070,11 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         """
         return self._execute(["docker", "pull", image], always_return=False)
 
-    def _run_image(self, image, docker_args=None, volumes=None, image_args=None):
+    def _run_image(self, image, docker_args=None, volumes=None, image_args=None, command_progress_parser=None, job=None):
         """
         Runs the image with the specified parameters.
+        For updating a job's progress, a progress parser method can be supplied. For a dummy implemented and
+        explanation of parameters see: dummy_command_progress_parser
 
         :param image: the URL of the image to run
         :type image: str
@@ -1068,7 +1103,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
         cmd.append(image)
         if image_args is not None:
             cmd.extend(image_args)
-        return self._execute(cmd, always_return=False)
+        return self._execute(cmd, always_return=False, command_progress_parser=command_progress_parser, job=job)
 
     def _pre_run(self, template, job):
         """
@@ -1172,3 +1207,22 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
             return f"Node's GPU compute capability ({hardware_info['gpus'][0]['compute']}) is too low for Docker image (requires >= {min_hardware_generation['min_compute_capability']})"
 
         return None
+
+
+def dummy_command_progress_parser(job_executor, job, cmd_output, last_progress):
+    """
+    Dummy implementation of a command progress parser for providing feedback to the backend about the progress.
+    Doesn't do anything, just returns the last progress.
+
+    :param job_executor: the reference to the job executor calling this method
+    :type job_executor: AbstractJobExecutor
+    :param job: the current job
+    :type job: dict
+    :param cmd_output: the command output string to process
+    :type cmd_output: str
+    :param last_progress: the last reported progress (0-1)
+    :type last_progress: float
+    :return: returns the progress (0-1)
+    :rtype: float
+    """
+    return last_progress
