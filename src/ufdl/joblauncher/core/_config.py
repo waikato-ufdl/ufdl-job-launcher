@@ -43,7 +43,7 @@ def load_config(config_file=None):
 
     config = configparser.ConfigParser()
     config.read(config_file)
-    _check_section(config_file, config, "general", ["debug", "pip_no_cache", "compression", "poll", "gpu_id"])
+    _check_section(config_file, config, "general", ["debug", "pip_no_cache", "compression", "poll", "gpu_id", "cancel_check_wait"])
     _check_section(config_file, config, "backend", ["url", "user", "password"])
     _check_section(config_file, config, "docker", ["work_dir", "cache_dir", "use_sudo", "ask_sudo_pw", "use_current_user"])
     _check_section(config_file, config, "poll_simple", ["interval"])

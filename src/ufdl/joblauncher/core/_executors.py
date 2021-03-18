@@ -62,6 +62,9 @@ class AbstractJobExecutor(object):
         self._notification_type = None
         self._template = None
         self._job = None
+        self._last_cancel_check = None
+        self._cancel_check_wait = int(config['general']['cancel_check_wait'])
+        self._job_is_cancelled = False
 
     @property
     def debug(self):
@@ -376,7 +379,7 @@ class AbstractJobExecutor(object):
         :param cmd: the command as list of strings
         :type cmd: list
         :param always_return: whether to always return the subprocess.CompletedProcess object or only
-                              if the returncode is non-zero
+                              if the return code is non-zero
         :type always_return: bool
         :param no_sudo: temporarily disable sudo
         :type no_sudo: bool
@@ -420,6 +423,10 @@ class AbstractJobExecutor(object):
                 process = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, bufsize=1)
                 last_progress = 0.0
                 while True:
+                    # terminate job if canceled
+                    if self.is_job_cancelled(job):
+                        process.terminate()
+                        break
                     line = process.stdout.readline()
                     if not line:
                         break
@@ -431,8 +438,12 @@ class AbstractJobExecutor(object):
                         except:
                             command_progress_parser = None
                             self.log_msg("Failed to parse progress output, disabling!", traceback.format_exc())
-                retcode = process.wait()
-                result = CompletedProcess(full, retcode, stdout=stdout_list, stderr=None)
+                if self.is_job_cancelled(job):
+                    stdout_list.append("Job was cancelled")
+                    result = CompletedProcess(full, 255, stdout=stdout_list, stderr=None)
+                else:
+                    retcode = process.wait()
+                    result = CompletedProcess(full, retcode, stdout=stdout_list, stderr=None)
         except:
             result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
 
@@ -716,7 +727,6 @@ class AbstractJobExecutor(object):
         :param data: other JSON meta-data about the progress
         :type data: RawJSONElement
         """
-        # TODO make public
         try:
             progress_job(self.context, job_pk, progress, **data)
         except:
@@ -878,6 +888,26 @@ class AbstractJobExecutor(object):
         """
         return None
 
+    def is_job_cancelled(self, job):
+        """
+        Checks if this job has been cancelled. If the _job_is_cancelled flag is not set, then queries the backend
+        (at most every self._cancel_check_wait seconds).
+
+        :param job: the job object to check for
+        :type job: dict
+        :return: Whether the job has been cancelled
+        :rtype: bool
+        """
+        result = self._job_is_cancelled
+        if not result:
+            now = datetime.now()
+            if (self._last_cancel_check is None) or ((now - self._last_cancel_check).total_seconds() >= self._cancel_check_wait):
+                # TODO query backend
+                print("TODO: CANCEL CHECK BACKEND")
+                self._last_cancel_check = now
+
+        return result
+
     def run(self, template=None, job=None):
         """
         Applies the template and executes the job. Raises an exception if it fails.
@@ -905,7 +935,7 @@ class AbstractJobExecutor(object):
             try:
                 self._ping_backend()  # make sure we still have a connection
                 self._do_run(template, job)
-                do_run_success = True
+                do_run_success = not self.is_job_cancelled(job)
             except:
                 error = "Failed to execute do-run code:\n%s" % traceback.format_exc()
                 self.log_msg(error)
