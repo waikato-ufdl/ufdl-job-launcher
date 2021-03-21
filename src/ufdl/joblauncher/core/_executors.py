@@ -17,7 +17,7 @@ from ufdl.pythonclient.functional.core.nodes.node import ping as node_ping
 from ufdl.pythonclient.functional.core.nodes.cuda import retrieve as cuda_retrieve
 from ufdl.pythonclient.functional.core.nodes.docker import retrieve as docker_retrieve
 from ufdl.pythonclient.functional.core.nodes.hardware import retrieve as hardware_retrieve
-from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output
+from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output, retrieve as job_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job, progress_job
 from wai.json.object import Absent
 
@@ -727,10 +727,20 @@ class AbstractJobExecutor(object):
         :param data: other JSON meta-data about the progress
         :type data: RawJSONElement
         """
+        # Progress updates to a cancelled job will fail, so skip updating
+        # the progress if we know we're cancelled already
+        if self.is_job_cancelled():
+            return
+
         try:
             progress_job(self.context, job_pk, progress, **data)
         except:
             self.log_msg("Failed to update backend on progress to backend:\n%s" % (traceback.format_exc()))
+
+            # Assume the progress update failed because the job was cancelled,
+            # and perform an check to see if this is the case, so all
+            # future checks will show this immediately
+            self.is_job_cancelled(immediate=True)
 
     def _upload(self, job_pk, output_name, output_type, localfile):
         """
@@ -888,22 +898,27 @@ class AbstractJobExecutor(object):
         """
         return None
 
-    def is_job_cancelled(self, job):
+    def is_job_cancelled(self, job=None, immediate=False):
         """
         Checks if this job has been cancelled. If the _job_is_cancelled flag is not set, then queries the backend
         (at most every self._cancel_check_wait seconds).
 
         :param job: the job object to check for
         :type job: dict
+        :param immediate: whether to ignore the check throttling and check immediately
+        :type immediate: bool
         :return: Whether the job has been cancelled
         :rtype: bool
         """
         result = self._job_is_cancelled
         if not result:
             now = datetime.now()
-            if (self._last_cancel_check is None) or ((now - self._last_cancel_check).total_seconds() >= self._cancel_check_wait):
-                # TODO query backend
-                print("TODO: CANCEL CHECK BACKEND")
+            if immediate or (self._last_cancel_check is None) or ((now - self._last_cancel_check).total_seconds() >= self._cancel_check_wait):
+                if job is None:
+                    job = self.job
+                job_pk = int(job['pk'])
+                updated_job = job_retrieve(self.context, job_pk)
+                result = self._job_is_cancelled = updated_job['is_cancelled']
                 self._last_cancel_check = now
 
         return result
