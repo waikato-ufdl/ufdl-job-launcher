@@ -935,7 +935,7 @@ class AbstractJobExecutor(object):
             try:
                 self._ping_backend()  # make sure we still have a connection
                 self._do_run(template, job)
-                do_run_success = not self.is_job_cancelled(job)
+                do_run_success = True
             except:
                 error = "Failed to execute do-run code:\n%s" % traceback.format_exc()
                 self.log_msg(error)
