@@ -1157,7 +1157,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor):
                 self.docker_image[KEY_REGISTRY_PASSWORD])
             if res is not None:
                 logger().fatal("Failed to log into registry")
-                raise Exception(self._to_logentry(res, [self.docker_image[KEY_REGISTRY_USERNAME], self._docker_image[KEY_REGISTRY_PASSWORD]]))
+                raise Exception(self._to_logentry(res, [self.docker_image[KEY_REGISTRY_USERNAME], self.docker_image[KEY_REGISTRY_PASSWORD]]))
         self._use_gpu = not (str(self.docker_image[KEY_CPU]).lower() == "true")
         self._fail_on_error(self._pull_image(self.docker_image[KEY_IMAGE_URL]))
         return True
