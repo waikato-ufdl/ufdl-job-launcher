@@ -1,4 +1,5 @@
 job-launcher.conf
+job-launcher-docker.conf
 *~
 *.swp
 *.bak
