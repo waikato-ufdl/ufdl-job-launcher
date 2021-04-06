@@ -162,14 +162,10 @@ def register_node(context, config, info, debug=False):
         logger().info("Checking for jobs still registered to node %d" % pk)
         f = FilterSpec(
             expressions=[
-                    And(
-                        sub_expressions=[
-                            Exact(field="node", value=pk),
-                            not IsNull(field="start_time"),
-                            IsNull(field="end_time"),
-                            IsNull(field="error_reason")
-                        ]
-                    )
+                    Exact(field="node", value=pk) &
+                    ~IsNull(field="start_time") &
+                    IsNull(field="end_time") &
+                    IsNull(field="error_reason")
             ]
         )
         jobs = job_list(context, filter_spec=f)
