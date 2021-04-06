@@ -1,5 +1,4 @@
 import configparser
-import importlib
 import os
 from wai.lazypip import install_packages
 from ufdl.pythonclient import UFDLServerContext
@@ -163,10 +162,14 @@ def register_node(context, config, info, debug=False):
         logger().info("Checking for jobs still registered to node %d" % pk)
         f = FilterSpec(
             expressions=[
-                    Exact(field="node", value=pk) and
-                    not IsNull(field="start_time") and
-                    IsNull(field="end_time") and
-                    IsNull(field="error_reason")
+                    And(
+                        sub_expressions=[
+                            Exact(field="node", value=pk),
+                            not IsNull(field="start_time"),
+                            IsNull(field="end_time"),
+                            IsNull(field="error_reason")
+                        ]
+                    )
             ]
         )
         jobs = job_list(context, filter_spec=f)
