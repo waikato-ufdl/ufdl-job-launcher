@@ -11,10 +11,10 @@ from ._sleep import SleepSchedule
 from .poll import simple_poll
 from ufdl.pythonclient.functional.core.jobs.workable_template import retrieve as jobtemplate_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import list as job_list
-from ufdl.pythonclient.functional.core.jobs.job import reset_job
+from ufdl.pythonclient.functional.core.jobs.job import abort_job
 import ufdl.pythonclient.functional.core.nodes.node as node
 from ufdl.json.core.filter import FilterSpec
-from ufdl.json.core.filter.field import Exact
+from ufdl.json.core.filter.field import Exact, IsNull
 from ufdl.json.core.filter.logical import And
 from requests.exceptions import HTTPError
 
@@ -163,7 +163,10 @@ def register_node(context, config, info, debug=False):
         logger().info("Checking for jobs still registered to node %d" % pk)
         f = FilterSpec(
             expressions=[
-                    Exact(field="node", value=pk),
+                    Exact(field="node", value=pk) and
+                    not IsNull(field="start_time") and
+                    IsNull(field="end_time") and
+                    IsNull(field="error_reason")
             ]
         )
         jobs = job_list(context, filter_spec=f)
@@ -172,7 +175,7 @@ def register_node(context, config, info, debug=False):
             for j in jobs:
                 try:
                     logger().info("Resetting job #%d..." % j['pk'])
-                    reset_job(context, j['pk'])
+                    abort_job(context, j['pk'])
                 except:
                     logger().error("Failed to reset job #%d!" % j['pk'], exc_info=1)
 
