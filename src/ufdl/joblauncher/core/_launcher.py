@@ -9,7 +9,7 @@ from ._node import get_ipv4
 from ._sleep import SleepSchedule
 from .poll import simple_poll
 from ufdl.pythonclient.functional.core.jobs.workable_template import retrieve as jobtemplate_retrieve
-from ufdl.pythonclient.functional.core.jobs.job import finish_job, reset_job
+from ufdl.pythonclient.functional.core.jobs.job import finish_job, reset_job, release_job
 import ufdl.pythonclient.functional.core.nodes.node as node
 from ufdl.json.core.filter import FilterSpec
 from ufdl.json.core.filter.field import Exact, IsNull
@@ -175,6 +175,7 @@ def register_node(context, config, info, debug=False):
                 logger().info("Job #%d can be reset." % current_job)
                 try:
                     reset_job(context, current_job)
+                    release_job(context, current_job)
                 except:
                     logger().error("Failed to reset job #%d!" % current_job, exc_info=1)
                 else:
