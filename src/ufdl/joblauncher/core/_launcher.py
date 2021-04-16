@@ -9,8 +9,7 @@ from ._node import get_ipv4
 from ._sleep import SleepSchedule
 from .poll import simple_poll
 from ufdl.pythonclient.functional.core.jobs.workable_template import retrieve as jobtemplate_retrieve
-from ufdl.pythonclient.functional.core.jobs.job import list as job_list
-from ufdl.pythonclient.functional.core.jobs.job import abort_job
+from ufdl.pythonclient.functional.core.jobs.job import finish_job, reset_job
 import ufdl.pythonclient.functional.core.nodes.node as node
 from ufdl.json.core.filter import FilterSpec
 from ufdl.json.core.filter.field import Exact, IsNull
@@ -148,7 +147,7 @@ def register_node(context, config, info, debug=False):
             logger().info("Partially updating node %s/%d" % (ip, gpu_id))
             pk = int(nodes[0]['pk'])
             context.set_node_id(pk)
-            node.partial_update(context, pk, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
+            obj = node.partial_update(context, pk, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
         else:
             logger().info("Creating node %s/%d" % (ip, gpu_id))
             obj = node.create(context, ip=ip, index=gpu_id, driver_version=driver, hardware_generation=generation, gpu_mem=gpu_mem, cpu_mem=cpu_mem)
@@ -158,25 +157,28 @@ def register_node(context, config, info, debug=False):
         # store pk in context
         logger().info("Node PK %d" % pk)
 
-        # any jobs currently still open? -> reset them
-        logger().info("Checking for jobs still registered to node %d" % pk)
-        f = FilterSpec(
-            expressions=[
-                    Exact(field="node", value=pk) &
-                    ~IsNull(field="start_time") &
-                    IsNull(field="end_time") &
-                    IsNull(field="error_reason")
-            ]
-        )
-        jobs = job_list(context, filter_spec=f)
-        logger().info("Found #%d jobs still registered for node." % len(jobs))
-        if len(jobs) > 0:
-            for j in jobs:
+        # any jobs currently still open? -> finish/reset them
+        current_job = obj['current_job']
+        if current_job is not None:
+            logger().info("Found job #%d still registered for node." % current_job)
+            error = "Node restarted during job execution."
+            result = None
+
+            try:
+                result = finish_job(context, current_job, False, "", error)
+            except:
+                logger().error("Failed to finalise job #%d!" % current_job, exc_info=1)
+            else:
+                logger().info("Job #%d successfully finalised." % current_job)
+
+            if result is not None and result['error_reason'] == error:
+                logger().info("Job #%d can be reset." % current_job)
                 try:
-                    logger().info("Resetting job #%d..." % j['pk'])
-                    abort_job(context, j['pk'])
+                    reset_job(context, current_job)
                 except:
-                    logger().error("Failed to reset job #%d!" % j['pk'], exc_info=1)
+                    logger().error("Failed to reset job #%d!" % current_job, exc_info=1)
+                else:
+                    logger().info("Job #%d successfully reset." % current_job)
 
         return True
     except HTTPError as e:
