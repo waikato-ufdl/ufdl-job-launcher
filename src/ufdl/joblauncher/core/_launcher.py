@@ -8,7 +8,7 @@ from ._utils import load_class
 from ._node import get_ipv4
 from ._sleep import SleepSchedule
 from .poll import simple_poll
-from ufdl.pythonclient.functional.core.jobs.workable_template import retrieve as jobtemplate_retrieve
+from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import finish_job, reset_job, release_job
 import ufdl.pythonclient.functional.core.nodes.node as node
 from ufdl.json.core.filter import FilterSpec
