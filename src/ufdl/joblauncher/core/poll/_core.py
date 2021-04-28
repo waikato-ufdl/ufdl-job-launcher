@@ -18,6 +18,7 @@ def generate_filter(debug=False):
             And(
                 sub_expressions=[
                     IsNull(field="start_time"),
+                    IsNull(field="error_reason"),
                     IsNull(field="node"),
                     ~IsNull(field="template.workabletemplate")
             ])
