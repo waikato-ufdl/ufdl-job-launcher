@@ -41,6 +41,8 @@ setup(
         "ufdl.json-messages",
         "psutil",
         "pyyaml",
+        "ufdl.jobtypes",
+        "ufdl.jobcontracts"
     ],
     entry_points={
         "console_scripts": [

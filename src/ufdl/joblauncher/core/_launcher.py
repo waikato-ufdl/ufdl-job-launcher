@@ -7,6 +7,7 @@ from ._logging import logger
 from ._utils import load_class
 from ._node import get_ipv4
 from ._sleep import SleepSchedule
+from .executors import AbstractJobExecutor
 from .poll import simple_poll
 from ufdl.pythonclient.functional.core.jobs.job_template import retrieve as jobtemplate_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import finish_job, reset_job, release_job
@@ -51,20 +52,21 @@ def load_executor_class(class_name, required_packages, no_cache=True, debug=Fals
     :param debug: whether to output debugging information
     :type debug: bool
     :return: the class object
-    :rtype: class
     """
     if debug:
         logger().debug("Loading executor: %s - required packages: %s" % (class_name, required_packages))
 
-    if required_packages is not None and (required_packages == ""):
+    if required_packages == "":
         required_packages = None
-    if required_packages is not None:
-        pip_args = ["--upgrade"]
-        if no_cache:
-            pip_args.append("--no-cache-dir")
-        install_packages(required_packages.split(" "), pip_args=pip_args)
 
-    return load_class(class_name, debug=debug)
+    return load_class(
+        class_name,
+        required_type=AbstractJobExecutor,
+        debug=debug,
+        no_cache=no_cache,
+        required_packages=required_packages.split(" ") if required_packages is not None else None,
+        upgrade=True
+    )
 
 
 def create_executor(context, config, job, debug=False):
@@ -87,12 +89,12 @@ def create_executor(context, config, job, debug=False):
     template = jobtemplate_retrieve(context, job['template']['pk'])
 
     cls = load_executor_class(
-        template["executor_class"], template["required_packages"],
-        no_cache=config['general']['pip_no_cache'] == 'true', debug=debug)
-    executor = cls(context, config)
-    executor.job = job
-    executor.template = template
-    return executor
+        template["executor_class"],
+        template["required_packages"],
+        no_cache=config['general']['pip_no_cache'] == 'true',
+        debug=debug
+    )
+    return cls(context, config, template, job)
 
 
 def register_node(context, config, info, debug=False):
@@ -228,7 +230,7 @@ def get_next_job(poller, context, config, info, debug=False):
     """
     def prepare_job(job):
         executor = create_executor(context, config, job, debug)
-        cant_run_reason = executor.can_run(executor.job, executor.template, info)
+        cant_run_reason = executor.can_run(info)
         if cant_run_reason is not None:
             if debug:
                 logger().debug(
