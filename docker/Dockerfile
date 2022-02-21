@@ -14,6 +14,8 @@ RUN apt-get update && \
 RUN mkdir /ufdl && \
     cd /ufdl && \
     git clone https://github.com/waikato-ufdl/ufdl-json-messages.git && \
+    git clone https://github.com/waikato-ufdl/ufdl-job-types.git && \
+    git clone https://github.com/waikato-ufdl/ufdl-job-contracts.git && \
     git clone https://github.com/waikato-ufdl/ufdl-python-client.git && \
     git clone https://github.com/waikato-ufdl/ufdl-job-launcher.git && \
     cd /ufdl/ufdl-job-launcher && \

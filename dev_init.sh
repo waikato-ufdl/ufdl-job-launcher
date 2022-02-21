@@ -182,6 +182,8 @@ echo "Installing dependencies..."
 ./$VENV/bin/pip install --use-deprecated=legacy-resolver wai.annotations
 ./$VENV/bin/pip install tensorflow
 ./$VENV/bin/pip install ../ufdl-json-messages
+./$VENV/bin/pip install ../ufdl-job-types
+./$VENV/bin/pip install ../ufdl-job-contracts
 ./$VENV/bin/pip install ../ufdl-python-client
 ./$VENV/bin/pip install wai.lazypip
 ./$VENV/bin/pip install psutil
