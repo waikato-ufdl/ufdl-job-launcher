@@ -21,7 +21,11 @@ def load_class(
     Will fail with an exception if class cannot be loaded.
 
     :param class_name: the executor class to load
+    :param required_type: the required type of the loaded class (raises if it is not this type)
     :param debug: whether to output debugging information
+    :param required_packages: optional list of packages that must be installed to find the class
+    :param no_cache: if pip's cache should be disabled
+    :param upgrade: forces upgrading of required packages (no-op if no packages required)
     :return: the class object
     """
     if debug:
@@ -33,11 +37,10 @@ def load_class(
     if no_cache:
         pip_args.append("--no-cache-dir")
 
-    module = (
-        require_module(module_name, required_packages, pip_args)
-        if not upgrade or required_packages is None else
+    if not upgrade or required_packages is None:
+        require_module(module_name, pip_args=pip_args)
+    else:
         install_packages(required_packages, pip_args + ["--upgrade"])
-    )
 
     module = importlib.import_module(module_name)
     importlib.reload(module)

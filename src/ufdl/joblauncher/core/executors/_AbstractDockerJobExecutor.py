@@ -2,9 +2,9 @@ import getpass
 import os
 import re
 import shlex
-import subprocess
+from subprocess import CompletedProcess
 from abc import abstractmethod
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from ufdl.jobtypes.base import String, UFDLJSONType
 from ufdl.jobtypes.standard import PK, Name
@@ -13,12 +13,13 @@ from ufdl.jobtypes.standard.server import DockerImage, DockerImageInstance
 
 from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.dataset import clear as dataset_clear, download as dataset_download
-from ufdl.pythonclient.functional.core.nodes.cuda import retrieve as cuda_retrieve
-from ufdl.pythonclient.functional.core.nodes.hardware import retrieve as hardware_retrieve
 
-from wai.json.raw import RawJSONObject
+from wai.json.object import Absent
 
+from ..config import UFDLJobLauncherConfig
+from ..types import Job, Template
 from .._logging import logger
+from .._node import HardwareInfo
 from .descriptors import Parameter
 from .parsers import CommandProgressParser
 from ._AbstractJobExecutor import AbstractJobExecutor
@@ -62,7 +63,13 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         Array(String())
     )
 
-    def __init__(self, context, config, template, job):
+    def __init__(
+            self,
+            context: UFDLServerContext,
+            config: UFDLJobLauncherConfig,
+            template: Template,
+            job: Job
+    ):
         """
         Initializes the executor with the backend context and configuration.
 
@@ -72,9 +79,9 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         :type config: configparser.ConfigParser
         """
         super(AbstractDockerJobExecutor, self).__init__(context, config, template, job)
-        self._use_current_user = (config['docker']['use_current_user'] == "true")
+        self._use_current_user = config.docker.use_current_user
         self._use_gpu = False
-        self._gpu_id = int(config['general']['gpu_id'])
+        self._gpu_id = config.general.gpu_id
         self._additional_gpu_flags = []
 
         docker_image_type = self._extract_domain_type_from_contract(self._contract)
@@ -100,33 +107,29 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         raise NotImplementedError(cls._extract_domain_type_from_contract.__qualname__)
 
     @property
-    def use_current_user(self):
+    def use_current_user(self) -> bool:
         """
         Returns whether the image is run as root (False) or as current user (True).
 
         :return: how the image is run
-        :rtype: bool
         """
         return self._use_current_user
 
     @property
-    def gpu_id(self):
+    def gpu_id(self) -> int:
         """
         Returns the GPU ID for this executor to use (corresponds to GPU index).
 
         :return: the GPU ID
-        :rtype: int
         """
         return self._gpu_id
 
-    def _version(self, include_patch=True):
+    def _version(self, include_patch: bool = True) -> Optional[str]:
         """
         Returns the docker version.
 
         :param include_patch: whether to include the patch version as well next to major/minor
-        :type include_patch: bool
         :return: the version string, None if failed to obtain
-        :rtype: str
         """
 
         res = self._execute(["docker", "--version"], no_sudo=True, capture_output=True)
@@ -146,15 +149,14 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
         return result
 
-    def _gpu_flags(self):
+    def _gpu_flags(self) -> List[str]:
         """
         If the GPU is to be used, returns the relevant flags as list.
         Additional GPU flags are appended from self._additional_gpu_flags (if GPU used).
 
         :return: the list of flags, empty list if none required
-        :rtype: list
         """
-        result = []
+        result: List[str] = []
 
         if self._use_gpu:
             version = self._version(include_patch=False)
@@ -168,53 +170,43 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
         return result
 
-    def _registry_login_required(self):
+    def _registry_login_required(self) -> bool:
         """
         Returns whether it is necessary to log into the registry.
 
         :return: True if necessary to log in
-        :rtype: bool
         """
-        return (self.docker_image[KEY_REGISTRY_USERNAME] is not None) \
-               and (self.docker_image[KEY_REGISTRY_USERNAME] != "")
+        return self.docker_image.registry_username not in (Absent, None, "")
 
-    def _login_registry(self, registry, user, password):
+    def _login_registry(self, registry: str, user: str, password: str) -> Optional[CompletedProcess]:
         """
         Logs into the specified registry.
 
         :param registry: the registry URL to log into
-        :type registry: str
         :param user: the user name for the registry
-        :type user: str
         :param password: the password for the registry
-        :type password: str
         :return: None if successfully logged in, otherwise subprocess.CompletedProcess
-        :rtype: subprocess.CompletedProcess
         """
         if self._execute_can_use_stdin():
             return self._execute(["docker", "login", "-u", user, "--password-stdin", registry], always_return=False, stdin=password, hide=[user])
         else:
             return self._execute(["docker", "login", "-u", user, "-p", password, registry], always_return=False, hide=[user, password])
 
-    def _logout_registry(self, registry):
+    def _logout_registry(self, registry: str) -> Optional[CompletedProcess]:
         """
         Logs out of the specified registry.
 
         :param registry: the registry URL to log out from
-        :type registry: str
         :return: None if successfully logged out, otherwise subprocess.CompletedProcess
-        :rtype: subprocess.CompletedProcess
         """
         return self._execute(["docker", "logout", registry], always_return=False)
 
-    def _pull_image(self, image):
+    def _pull_image(self, image: str) -> Optional[CompletedProcess]:
         """
         Pulls the requested image.
 
         :param image: the image to pull
-        :type image: str
         :return: None if successfully pulled, otherwise subprocess.CompletedProcess
-        :rtype: subprocess.CompletedProcess
         """
         return self._execute(["docker", "pull", image], always_return=False)
 
@@ -270,7 +262,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         for parameter, value in parameter_values.items():
             # Bool parameters have the true/false replacements defined in the body itself
             if isinstance(value, bool):
-                def replacer(string):
+                def replacer(string: str) -> Optional[str]:
                     matches = list(BOOL_TEMPLATE_MATCHER.finditer(string))
                     for match in reversed(matches):
                         if match.group('param_name') == parameter:
@@ -283,7 +275,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
             # Other types just replace the parameter name with its string representation
             else:
-                def replacer(string):
+                def replacer(string: str) -> str:
                     return string.replace("${" + parameter + "}", str(value))
 
             if isinstance(result, str):
@@ -334,12 +326,11 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
             cmd.extend(image_args)
         return self._execute(cmd, always_return=False, command_progress_parser=command_progress_parser)
 
-    def _pre_run(self):
+    def _pre_run(self) -> bool:
         """
         Hook method before the actual job is run.
 
         :return: whether successful
-        :rtype: bool
         """
         if not super()._pre_run():
             return False
@@ -357,36 +348,26 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         self._fail_on_error(self._pull_image(self.docker_image[KEY_IMAGE_URL]))
         return True
 
-    def _post_run(self, pre_run_success, do_run_success, error):
+    def _post_run(self, pre_run_success: bool, do_run_success: bool, error: Optional[str]) -> None:
         """
         Hook method after the actual job has been run. Will always be executed.
 
         :param pre_run_success: whether the pre_run code was successfully run
-        :type pre_run_success: bool
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
-        :type do_run_success: bool
         :param error: any error that may have occurred, None if none occurred
-        :type error: str
         """
         if self.docker_image is not None:
             if self._registry_login_required():
-                self._logout_registry(self.docker_image[KEY_REGISTRY_URL])
-            #self.docker_image = None
+                self._logout_registry(self.docker_image.registry_url)
 
         super()._post_run(pre_run_success, do_run_success, error)
 
-    def can_run(self, hardware_info):
+    def can_run(self, hardware_info: HardwareInfo) -> Optional[str]:
         """
         Checks if this job-executor is capable of running on the current node.
 
-        :param template: the job template that was applied
-        :type template: dict
-        :param job: the job with the actual values for inputs and parameters
-        :type job: dict
         :param hardware_info: the hardware info to use
-        :type hardware_info: dict
         :return: The reason the job can't be run, or None if it can.
-        :rtype: str|None
         """
         # Check any super-conditions
         super_reason = super().can_run(hardware_info)
@@ -395,35 +376,29 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
         # If we have no GPU or compatible software, the image must be CPU-runnable
         no_gpu_reason = (
-            f"Node has no GPUs"
-            if 'gpus' not in hardware_info or len(hardware_info['gpus']) == 0 else
-            f"Node has no GPU driver"
-            if 'driver' not in hardware_info else
-            f"Node has no CUDA version"
-            if 'cuda' not in hardware_info else
-            f"Node GPU has no compute capability"
-            if 'compute' not in hardware_info["gpus"][0] else
-            None
+            f"Node has no GPUs" if hardware_info.gpus is None or len(hardware_info.gpus) == 0
+            else f"Node has no GPU driver" if hardware_info.driver is None
+            else f"Node has no CUDA version" if hardware_info.cuda is None
+            else f"Node GPU has no compute capability" if hardware_info.gpus[0].compute is None
+            else None
         )
         if no_gpu_reason is not None:
-            if not self.docker_image.cpu:
-                return no_gpu_reason + " and Docker image is not CPU-only"
-            else:
-                return None
-
-        # Get the information about the CUDA version in the Docker image
-        cuda = cuda_retrieve(self.context, self.docker_image['cuda_version'])
+            return (
+                f"{no_gpu_reason} and Docker image is not CPU-only" if not self.docker_image.cpu
+                else None
+            )
 
         # Make sure the node supports the CUDA version and driver version
-        if self.docker_image.cuda_version.version > hardware_info["cuda"]:
-            return f"Node's CUDA version ({hardware_info['cuda']}) is too low for Docker image (requires >= {cuda['version']})"
-        elif self.docker_image.cuda_version.min_driver_version > hardware_info["driver"]:
-            return f"Node's driver version ({hardware_info['driver']}) is too low for Docker image (requires >= {cuda['min_driver_version']})"
+        cuda = self.docker_image.cuda_version
+        if cuda.version > hardware_info.cuda:
+            return f"Node's CUDA version ({hardware_info.cuda}) is too low for Docker image (requires >= {cuda.version})"
+        elif cuda.min_driver_version > hardware_info.driver:
+            return f"Node's driver version ({hardware_info.driver}) is too low for Docker image (requires >= {cuda.min_driver_version})"
 
         # Make sure our hardware is up-to-date
         min_hardware_generation = self.docker_image.min_hardware_generation
-        if min_hardware_generation is not None and min_hardware_generation.min_compute_capability > hardware_info["gpus"][0]["compute"]:
-            return f"Node's GPU compute capability ({hardware_info['gpus'][0]['compute']}) is too low " \
+        if min_hardware_generation is not None and min_hardware_generation.min_compute_capability > hardware_info.gpus[0].compute:
+            return f"Node's GPU compute capability ({hardware_info.gpus[0].compute}) is too low " \
                    f"for Docker image (requires >= {self.docker_image.min_hardware_generation.min_compute_capability})"
 
         return None

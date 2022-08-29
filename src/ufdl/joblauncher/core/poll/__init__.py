@@ -1,1 +1,1 @@
-from ._simple import poll as simple_poll
+from ._simple import Simple

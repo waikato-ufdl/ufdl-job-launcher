@@ -37,24 +37,24 @@ class Parameter(Generic[ParameterType]):
         self._cache: WeakKeyDictionary = WeakKeyDictionary()
 
     @property
-    def name(self):
+    def name(self) -> str:
         # Can't get a value until we're bound
         if self._name is None:
             raise Exception(f"{Parameter.__qualname__} not bound")
         return self._name
 
     @property
-    def types(self):
+    def types(self) -> Tuple[UFDLJSONType[tuple, ParameterType, Any], ...]:
         return self._types
 
     @property
-    def default(self):
+    def default(self) -> Union[ParameterType, Type[RequiredParameter]]:
         return self._default
 
     @overload
-    def __get__(self, instance: None, owner: Type['AbstractJobExecutor']) -> 'Parameter[ParameterType]':...
+    def __get__(self, instance: None, owner: Type['AbstractJobExecutor']) -> 'Parameter[ParameterType]': ...
     @overload
-    def __get__(self, instance: 'AbstractJobExecutor', owner: Type['AbstractJobExecutor']) -> ParameterType:...
+    def __get__(self, instance: 'AbstractJobExecutor', owner: Type['AbstractJobExecutor']) -> ParameterType: ...
 
     def __get__(self, instance: Optional['AbstractJobExecutor'], owner: Type['AbstractJobExecutor']) -> Union[ParameterType, 'Parameter[ParameterType]']:
         # If called from the class, return the descriptor itself

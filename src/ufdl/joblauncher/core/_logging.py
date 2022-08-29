@@ -1,14 +1,15 @@
 import logging
+from typing import Optional
 
-_logger = None
+_logger: Optional[logging.Logger] = None
 """ the global logger instance to use. """
 
-def init_logger(debug):
+
+def init_logger(debug: bool) -> None:
     """
     Initializes the logging.
 
     :param debug: whether to use debug level or just info
-    :type debug: bool
     """
     global _logger
     logging.basicConfig()
@@ -20,12 +21,11 @@ def init_logger(debug):
         _logger.setLevel(logging.INFO)
 
 
-def logger():
+def logger() -> logging.Logger:
     """
     Returns the logger instance.
 
     :return: the logger
-    :rtype: logging.Logger
     """
     if _logger is None:
         init_logger(False)

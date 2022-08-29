@@ -7,7 +7,7 @@ import subprocess
 from subprocess import CompletedProcess
 import tempfile
 import traceback
-from typing import Any, Generic, IO, Iterator, Optional, Tuple, Union, List, NoReturn
+from typing import Any, Dict, Generic, Iterator, Optional, Tuple, Union, List
 from zipfile import ZipFile
 
 from ufdl.jobcontracts.base import UFDLJobContract, Input, Output
@@ -24,17 +24,17 @@ from ufdl.jobtypes.util import parse_type
 from ufdl.json.core.filter import FilterSpec
 
 from ufdl.pythonclient import UFDLServerContext
-from ufdl.pythonclient.functional._base_actions import list as list_server
-from ufdl.pythonclient.functional.core._mixin_actions import download
 from ufdl.pythonclient.functional.core.nodes.node import ping as node_ping
 from ufdl.pythonclient.functional.core.jobs.job import add_output as job_add_output, retrieve as job_retrieve
 from ufdl.pythonclient.functional.core.jobs.job import acquire_job, start_job, finish_job, progress_job
 
 from wai.json.object import Absent
-from wai.json.raw import RawJSONObject
+from wai.json.raw import RawJSONObject, RawJSONElement
 
+from ..config import UFDLJobLauncherConfig
+from ..types import Job, Template
 from .._logging import logger
-from .._node import get_ipv4
+from .._node import get_ipv4, HardwareInfo
 from .._utils import load_class
 from .descriptors import ExtraOutput, Parameter
 from .parsers import CommandProgressParser
@@ -51,29 +51,33 @@ class AbstractJobExecutor(Generic[ContractType]):
     def cls_contract(cls) -> UFDLJobContract:
         return cls._cls_contract
 
-    def __init__(self, context, config, template, job):
+    def __init__(
+            self,
+            context: UFDLServerContext,
+            config: UFDLJobLauncherConfig,
+            template: Template,
+            job: Job
+    ):
         """
         Initializes the executor with the backend context and configuration.
 
         :param context: the server context
-        :type context: UFDLServerContext
         :param config: the configuration to use
-        :type config: configparser.ConfigParser
         """
-        self._debug = (config['general']['debug'] == "true")
+        self._debug = config.general.debug
         self._context = context
-        self._work_dir = config['docker']['work_dir']
-        self._cache_dir = config['docker']['cache_dir']
+        self._work_dir = config.docker.work_dir
+        self._cache_dir = config.docker.cache_dir
         self._job_dir = None
-        self._use_sudo = (config['docker']['use_sudo'] == "true")
-        self._ask_sudo_pw = (config['docker']['ask_sudo_pw'] == "true")
-        self._log = list()
-        self._compression = int(config['general']['compression'])
+        self._use_sudo = config.docker.use_sudo
+        self._ask_sudo_pw = config.docker.ask_sudo_pw
+        self._log: List[Dict[str, RawJSONObject]] = []
+        self._compression = config.general.compression
         self._notification_type = None
         self._template = template
         self._job = job
         self._last_cancel_check = None
-        self._cancel_check_wait = int(config['general']['cancel_check_wait'])
+        self._cancel_check_wait = config.general.cancel_check_wait
         self._job_is_cancelled = False
         self._input_value_cache = {}
 
@@ -90,7 +94,7 @@ class AbstractJobExecutor(Generic[ContractType]):
         self._contract: ContractType = contract
 
     @property
-    def debug(self):
+    def debug(self) -> bool:
         """
         Returns the debugging mode flag.
 
@@ -100,141 +104,132 @@ class AbstractJobExecutor(Generic[ContractType]):
         return self._debug
 
     @debug.setter
-    def debug(self, value):
+    def debug(self, value: bool):
         """
         Sets the debug flag.
 
         :param value: True to turn on debugging mode
-        :type value: bool
         """
         self._debug = value
 
     @property
-    def compression(self):
+    def compression(self) -> int:
         """
         Returns the compression in use.
 
         :return: the compression (see zipfile, ZIP_STORED/0 = no compression)
-        :rtype: int
         """
         return self._compression
 
     @compression.setter
-    def compression(self, value):
+    def compression(self, value: int):
         """
         Sets the compression to use.
 
         :param value: the compression (see zipfile, ZIP_STORED/0 = no compression)
-        :type value: int
         """
         self._compression = value
 
     @property
-    def context(self):
+    def context(self) -> UFDLServerContext:
         """
         Returns the UFDL server context.
 
         :return: the context
-        :rtype: UFDLServerContext
         """
         return self._context
 
     @property
-    def contract(self):
+    def contract(self) -> ContractType:
+        """
+        Gets the contract that this executor is fulfilling.
+        """
         return self._contract
 
     @property
-    def work_dir(self):
+    def work_dir(self) -> str:
         """
         Returns the working directory. Used for temp files and dirs.
 
         :return: the directory
-        :rtype: str
         """
         return self._work_dir
 
     @property
-    def cache_dir(self):
+    def cache_dir(self) -> str:
         """
         Returns the cache directory. Used for base models etc.
 
         :return: the directory
-        :rtype: str
         """
         return self._cache_dir
 
     @property
-    def job_dir(self):
+    def job_dir(self) -> str:
         """
         Returns the working directory. Used for temp files and dirs.
 
         :return: the directory for the job (gets created before actual run and deleted afterwards again)
-        :rtype: str
         """
         return self._job_dir
 
     @property
-    def use_sudo(self):
+    def use_sudo(self) -> bool:
         """
         Returns whether commands are prefixed with sudo.
 
         :return: true if prefixing commands
-        :rtype: bool
         """
         return self._use_sudo
 
     @property
-    def ask_sudo_pw(self):
+    def ask_sudo_pw(self) -> bool:
         """
         Returns whether to prompt user in console for sudo password.
 
         :return: true if prompting
-        :rtype: bool
         """
         return self._ask_sudo_pw
 
     @property
-    def notification_type(self):
+    def notification_type(self) -> str:
         """
         Returns the type of notification to send out.
 
         :return: the type of notification (eg email)
-        :rtype: str
         """
         return self._notification_type
 
     @property
-    def job(self):
+    def job(self) -> Job:
         """
         Returns the job of this executor.
 
         :return: the job
-        :rtype: dict
         """
         return self._job
 
     @property
-    def job_pk(self):
+    def job_pk(self) -> int:
         return int(self._job['pk'])
 
     @property
-    def template(self):
+    def template(self) -> Template:
         """
         Returns the template of this executor.
 
         :return: the template
-        :rtype: dict
         """
         return self._template
 
-    def __getattribute__(self, item):
+    def __getattribute__(self, item: str) -> Any:
         # Hack to make instance descriptors work like class descriptors
         attribute = super().__getattribute__(item)
         if isinstance(attribute, Parameter):
             return attribute.__get__(self, type(self))
         return attribute
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: Any) -> None:
         # Hack to make instance descriptors work like class descriptors
         try:
             attribute = super().__getattribute__(key)
@@ -286,11 +281,13 @@ class AbstractJobExecutor(Generic[ContractType]):
 
         self._add_output_to_job(key.name, key.type, value)
 
-    def _initialise_contracts_and_types(self):
+    def _initialise_contracts_and_types(self) -> None:
         def list_function(table_name: str, filters: FilterSpec) -> List[RawJSONObject]:
+            from ufdl.pythonclient.functional._base_actions import list as list_server
             return list_server(self.context, f"v1/{table_name}", filters)
 
         def download_function(table_name: str, pk: int) -> Union[bytes, Iterator[bytes]]:
+            from ufdl.pythonclient.functional.core._mixin_actions import download
             return download(self.context, f"v1/{table_name}", pk)
 
         initialise_types(
@@ -342,42 +339,40 @@ class AbstractJobExecutor(Generic[ContractType]):
             type.format_python_value(value)
         )
 
-    def _add_log(self, data):
+    def _add_log(self, data: RawJSONObject) -> None:
         """
         Adds the data under a new timestamp to the internal log.
 
         :param data: the object to add
-        :type data: object
         """
-        entry = dict()
-        entry[str(datetime.now())] = data
-        self._log.append(entry)
+        self._log.append(
+            {
+                str(datetime.now()): data
+            }
+        )
 
-    def _obscure(self, args, hide):
+    def _obscure(
+            self,
+            args: List[str],
+            hide: Optional[List[str]]
+    ) -> List[str]:
         """
         Obscures/masks the specified list of strings in the
 
         :param args: the list of string arguments to process
-        :type args: list
         :param hide: the list of strings to hide
-        :type hide: list
         :return: the obscured list of strings
-        :rtype: list
         """
-
         if (hide is None) or (len(hide) == 0):
             return args
 
-        result = []
         to_hide = set(hide)
-        for arg in args:
-            if arg in to_hide:
-                result.append("*" * 3)
-            else:
-                result.append(arg)
-        return result
+        return [
+            "***" if arg in to_hide else arg
+            for arg in args
+        ]
 
-    def log_msg(self, *args):
+    def log_msg(self, *args: Any) -> None:
         """
         For logging debugging messages.
 
@@ -399,63 +394,64 @@ class AbstractJobExecutor(Generic[ContractType]):
                 logger().error("Failed to write log data to: %s" % log)
                 logger().error(traceback.format_exc())
 
-    def log_file(self, msg, filename):
+    def log_file(self, msg: str, filename: str) -> None:
         """
         Reads the specified file and then logs the message and its content.
 
         :param msg: the message to prepend the file content
-        :type msg: str
         :param filename: the file to read
-        :type filename: str
         """
         try:
             with open(filename, "r") as lf:
                 lines = lf.readlines()
-            self.log_msg("%s\n%s" % (msg, "".join(lines)))
-        except:
-            self.log_msg("Failed to read file: %s\n%s" % (filename, traceback.format_exc()))
 
-    def _mktmpdir(self):
+            joined_lines = "".join(lines)
+
+            self.log_msg(
+                f"{msg}\n"
+                f"{joined_lines}"
+            )
+        except:
+            self.log_msg(
+                f"Failed to read file: {filename}\n"
+                f"{traceback.format_exc()}"
+            )
+
+    def _mktmpdir(self) -> str:
         """
         Creates a temp directory in the working directory and returns the absolute path.
 
         :return: the tmp directory that has been created
-        :rtype: str
         """
         return tempfile.mkdtemp(suffix="", prefix="", dir=self.work_dir)
 
-    def _mkdir(self, directory):
+    def _mkdir(self, directory: str):
         """
         Creates the specified directory.
 
         :param directory: the directory to create
-        :type directory: str
         """
         self.log_msg("mkdir:", directory)
         os.mkdir(directory)
 
-    def _rmdir(self, directory):
+    def _rmdir(self, directory: str):
         """
         Removes the directory recursively.
 
         :param directory: the directory to delete
-        :type directory: str
         """
         self.log_msg("rmdir:", directory)
         shutil.rmtree(directory, ignore_errors=True)
 
-    def _to_logentry(self, completed, hide):
+    def _to_logentry(self, completed: CompletedProcess, hide: List[str]) -> RawJSONObject:
         """
         Turns the CompletedProcess object into a log entry.
 
         :param completed: the CompletedProcess object to convert
-        :type completed: CompletedProcess
         :param hide: the list of strings to obscure in the log message
-        :type hide: list
         :return: the log entry
-        :rtype: dict
         """
-        result = dict()
+        result: RawJSONObject = dict()
         result['cmd'] = self._obscure(completed.args, hide)
         if completed.stdout is not None:
             if isinstance(completed.stdout, str):
@@ -474,63 +470,61 @@ class AbstractJobExecutor(Generic[ContractType]):
         result['returncode'] = completed.returncode
         return result
 
-    def _ping_backend(self):
+    def _ping_backend(self) -> None:
         """
         Ensuring that the connection is still live.
         """
         try:
             node_ping(self.context)
         except:
-            self.log_msg("Failed to ping backend:\n%s" % traceback.format_exc())
+            self.log_msg(
+                f"Failed to ping backend:\n"
+                f"{traceback.format_exc()}"
+            )
 
-    def _execute_can_use_stdin(self, no_sudo=None):
+    def _execute_can_use_stdin(self, no_sudo: bool = False) -> bool:
         """
         Returns whether the _execute function can use stdin.
         Not possible if sudo is asking for password.
 
         :return: True if it can make use of stdin
         """
-        if self.use_sudo:
-            if no_sudo is None or no_sudo is False:
-                if self.ask_sudo_pw:
-                    return False
-        return True
+        return not (self.use_sudo and not no_sudo and self.ask_sudo_pw)
 
-    def _execute(self, cmd, always_return=True, no_sudo=None, capture_output=True, stdin=None, hide=None, command_progress_parser: Optional[CommandProgressParser] = None):
+    def _execute(
+            self,
+            cmd: List[str],
+            always_return: bool = True,
+            no_sudo: bool = False,
+            capture_output: bool = True,
+            stdin: Optional[str] = None,
+            hide: Optional[List[str]] = None,
+            command_progress_parser: Optional[CommandProgressParser] = None
+    ) -> Optional[CompletedProcess]:
         """
         Executes the command.
         For updating a job's progress, a progress parser method can be supplied. For a dummy implemented and
         explanation of parameters see: dummy_command_progress_parser
 
         :param cmd: the command as list of strings
-        :type cmd: list
         :param always_return: whether to always return the subprocess.CompletedProcess object or only
                               if the return code is non-zero
-        :type always_return: bool
         :param no_sudo: temporarily disable sudo
-        :type no_sudo: bool
         :param capture_output: whether to capture the output from stdout and stderr
-        :type capture_output: bool
         :param stdin: the text to feed into the process via stdin
-        :type stdin: str
         :param hide: the list of strings to obscure in the log message
-        :type hide: list
         :param command_progress_parser: the parser for the command output for updating the progress in the backend
-        :type command_progress_parser: object
         :return: the CompletedProcess object from executing the command, uses 255 as return code in case of an
                  exception and stores the stack trace in stderr
-        :rtype: subprocess.CompletedProcess
         """
-
         if (stdin is not None) and (not self._execute_can_use_stdin(no_sudo)):
             raise Exception("Cannot feed data into stdin of process! E.g., when sudo is asking for password.")
 
         full = []
-        if self.use_sudo:
-            if no_sudo is None or no_sudo is False:
-                full.append("sudo")
-                if self.ask_sudo_pw:
-                    full.append("-S")
+        if self.use_sudo and not no_sudo:
+            full.append("sudo")
+            if self.ask_sudo_pw:
+                full.append("-S")
         full.extend(cmd)
 
         self.log_msg("Executing:", " ".join(self._obscure(full, hide)))
@@ -558,7 +552,7 @@ class AbstractJobExecutor(Generic[ContractType]):
                         stdout_list.append(line)
                     if capture_output and (command_progress_parser is not None):
                         try:
-                            last_progress = command_progress_parser(line, last_progress)
+                            last_progress = command_progress_parser.parse(line, last_progress)
                         except:
                             command_progress_parser = None
                             self.log_msg("Failed to parse progress output, disabling!", traceback.format_exc())
@@ -578,36 +572,50 @@ class AbstractJobExecutor(Generic[ContractType]):
         else:
             return None
 
-    def _fail_on_error(self, completed):
+    def _fail_on_error(self, completed: CompletedProcess) -> None:
         """
         Raises an exception if the CompletedProcess object has a non-zero exit code.
 
         :param completed: the CompletedProcess object to inspect
-        :type completed: CompletedProcess
         :raises: Exception
         """
         if isinstance(completed, CompletedProcess):
             if completed.returncode != 0:
-                error = "Failed to execute command:\n%s" % " ".join(completed.args)
-                error += "\nreturn code:\n%d" % completed.returncode
-                if completed.stdout is not None:
-                    error += "\nstdout:\n%s" % completed.stdout
-                if completed.stderr is not None:
-                    error += "\nstderr:\n%s" % completed.stderr
-                raise Exception(error)
+                args = " ".join(completed.args)
+                stdout = (
+                    f"\n"
+                    f"stdout:\n"
+                    f"{completed.stdout}" if completed.stdout is not None
+                    else ""
+                )
+                stderr = (
+                    f"\n"
+                    f"stderr:\n"
+                    f"{completed.stderr}" if completed.stderr is not None
+                    else ""
+                )
+                raise Exception(
+                    f"Failed to execute command:\n"
+                    f"{args}\n"
+                    f"return code:\n"
+                    f"{completed.returncode}"
+                    f"{stdout}"
+                    f"{stderr}"
+                )
 
-    def _compress(self, files, zipfile, strip_path=None):
+    def _compress(
+            self,
+            files: List[str],
+            zipfile: str,
+            strip_path: Union[None, bool, str] = None
+    ) -> Optional[str]:
         """
         Compresses the files and stores them in the zip file.
 
         :param files: the list of files to compress
-        :type files: list
         :param zipfile: the zip file to create
-        :type zipfile: str
         :param strip_path: whether to strip the path: True for removing completely, or prefix string to remove
-        :type strip_path: bool or str
         :return: None if successful, otherwise error message
-        :rtype: str
         """
 
         self.log_msg("Compressing:", files, "->", zipfile)
@@ -626,19 +634,19 @@ class AbstractJobExecutor(Generic[ContractType]):
                     zf.write(f, arcname=arcname)
             return None
         except:
-            msg = "Failed to compress files '%s' into '%s':\n%s" \
-                  % (",".join(files), zipfile, traceback.format_exc())
+            msg = (
+                f"Failed to compress files '{''', '''.join(files)}' into '{zipfile}':\n"
+                f"{traceback.format_exc()}"
+            )
             self.log_msg(msg)
             return msg
 
-    def _decompress(self, zipfile, output_dir):
+    def _decompress(self, zipfile: str, output_dir: str) -> Optional[str]:
         """
         Decompresses a zipfile into the specified output directory.
 
         :param zipfile: the zip file to decompress
-        :type zipfile: str
         :param output_dir: the output directory
-        :type output_dir: str
         """
 
         self.log_msg("Decompressing:", zipfile, "->", output_dir)
@@ -647,17 +655,17 @@ class AbstractJobExecutor(Generic[ContractType]):
             with ZipFile(zipfile, "r") as zf:
                 zf.extractall(output_dir)
         except:
-            return "Failed to decompress '%s' to '%s':\n%s" \
-                   % (zipfile, output_dir, traceback.format_exc())
+            return (
+                f"Failed to decompress '{zipfile}' to '{output_dir}':\n"
+                f"{traceback.format_exc()}"
+            )
 
-    def _any_present(self, files):
+    def _any_present(self, files: List[str]) -> bool:
         """
         Checks whether at least one of the files listed is present in the file system.
 
         :param files: the file names to check (absolute paths)
-        :type files: list
         :return: True if at least one present
-        :rtype: bool
         """
         result = False
 
@@ -668,14 +676,12 @@ class AbstractJobExecutor(Generic[ContractType]):
 
         return result
 
-    def progress(self, progress, **data):
+    def progress(self, progress: float, **data: RawJSONElement):
         """
         Updates the server on the progress of the job.
 
         :param progress: the progress amount in [0.0, 1.0]
-        :type progress: float
         :param data: other JSON meta-data about the progress
-        :type data: RawJSONElement
         """
         # Progress updates to a cancelled job will fail, so skip updating
         # the progress if we know we're cancelled already
@@ -685,10 +691,13 @@ class AbstractJobExecutor(Generic[ContractType]):
         try:
             progress_job(self.context, self.job_pk, progress, **data)
         except:
-            self.log_msg("Failed to update backend on progress to backend:\n%s" % (traceback.format_exc()))
+            self.log_msg(
+                f"Failed to update backend on progress to backend:\n"
+                f"{traceback.format_exc()}"
+            )
 
             # Assume the progress update failed because the job was cancelled,
-            # and perform an check to see if this is the case, so all
+            # and perform a check to see if this is the case, so all
             # future checks will show this immediately
             self.is_job_cancelled(immediate=True)
 
@@ -740,63 +749,87 @@ class AbstractJobExecutor(Generic[ContractType]):
         if self._compress(files, zipfile, strip_path=strip_path) is None:
             self._upload(output, zipfile, file_type)
 
-    def _pre_run(self):
+    def _pre_run(self) -> bool:
         """
         Hook method before the actual job is run.
 
         :return: whether successful
-        :rtype: bool
         """
         # TODO retrieve notification type from user
         self._notification_type = "email"
 
         # basic info
-        self.log_msg("IP:", get_ipv4())
-        self.log_msg("Use sudo:", str(self.use_sudo))
-        self.log_msg("Ask sudo password:", str(self.ask_sudo_pw))
-        self.log_msg("Notification:", self._notification_type)
-        self.log_msg("Job:\n" + str(self._job))
-        self.log_msg("Template:\n" + str(self._template))
+        self.log_msg(f"IP: {get_ipv4()}")
+        self.log_msg(f"Use sudo: {self.use_sudo}")
+        self.log_msg(f"Ask sudo password: {self.ask_sudo_pw}")
+        self.log_msg(f"Notification: {self._notification_type}")
+        self.log_msg(
+            f"Job:\n"
+            f"{self._job}"
+        )
+        self.log_msg(
+            f"Template:\n"
+            f"{self._template}"
+        )
 
         # jobdir
         self._job_dir = self._mktmpdir()
-        self.log_msg("Created jobdir:", self.job_dir)
+        self.log_msg(f"Created jobdir: {self._job_dir}")
 
         # acquire
         try:
             acquire_job(self.context, self.job_pk)
         except HTTPError as e:
-            self.log_msg("Failed to acquire job %d!\n%s\n%s" % (self.job_pk, str(e.response.text), traceback.format_exc()))
-            return
-        except:
-            self.log_msg("Failed to acquire job %d!\n%s" % (self.job_pk, traceback.format_exc()))
+            self.log_msg(
+                f"Failed to acquire job {self.job_pk}!\n"
+                f"{e.response.text}\n"
+                f"{traceback.format_exc()}"
+            )
             return False
+        except:
+            self.log_msg(
+                f"Failed to acquire job {self.job_pk}!\n"
+                f"{traceback.format_exc()}"
+            )
+            return False
+
         # start
         try:
             start_job(self.context, self.job_pk, self.notification_type)
         except HTTPError as e:
-            self.log_msg("Failed to start job %d!\n%s\%s" % (self.job_pk, str(e.response.text), traceback.format_exc()))
+            self.log_msg(
+                f"Failed to start job {self.job_pk}!\n"
+                f"{e.response.text}\n"
+                f"{traceback.format_exc()}"
+            )
             return False
         except:
-            self.log_msg("Failed to start job %d!\n%s" % (self.job_pk, traceback.format_exc()))
+            self.log_msg(
+                f"Failed to start job {self.job_pk}!\n"
+                f"{traceback.format_exc()}"
+            )
+            return False
+
         return True
 
-    def _do_run(self):
+    def _do_run(self) -> None:
         """
         Executes the actual job. Only gets run if pre-run was successful.
         """
-        raise NotImplemented()
+        raise NotImplementedError(self._do_run.__qualname__)
 
-    def _post_run(self, pre_run_success, do_run_success, error):
+    def _post_run(
+            self,
+            pre_run_success: bool,
+            do_run_success: bool,
+            error: Optional[str]
+    ) -> None:
         """
         Hook method after the actual job has been run. Will always be executed.
 
         :param pre_run_success: whether the pre_run code was successfully run
-        :type pre_run_success: bool
         :param do_run_success: whether the do_run code was successfully run (only gets run if pre-run was successful)
-        :type do_run_success: bool
         :param error: any error that may have occurred, None if none occurred
-        :type error: str
         """
 
         # zip+upload log
@@ -821,38 +854,43 @@ class AbstractJobExecutor(Generic[ContractType]):
             self._rmdir(self.job_dir)
         self._job_dir = None
 
-    def can_run(self, hardware_info):
+    def can_run(self, hardware_info: HardwareInfo):
         """
         Checks if this job-executor is capable of running on the current node.
 
         :param hardware_info: the hardware info to use
-        :type hardware_info: dict
         :return: The reason the job can't be run, or None if it can.
         :rtype: str|None
         """
         return None
 
-    def is_job_cancelled(self, immediate=False):
+    def is_job_cancelled(self, immediate: bool = False) -> bool:
         """
-        Checks if this job has been cancelled. If the _job_is_cancelled flag is not set, then queries the backend
-        (at most every self._cancel_check_wait seconds).
+        Checks if this job has been cancelled. Queries the backend if the _job_is_cancelled flag is not set,
+        (at-most every self._cancel_check_wait seconds).
 
         :param immediate: whether to ignore the check throttling and check immediately
-        :type immediate: bool
         :return: Whether the job has been cancelled
-        :rtype: bool
         """
-        result = self._job_is_cancelled
-        if not result:
-            now = datetime.now()
-            if immediate or (self._last_cancel_check is None) or ((now - self._last_cancel_check).total_seconds() >= self._cancel_check_wait):
-                updated_job = job_retrieve(self.context, self.job_pk)
-                result = self._job_is_cancelled = updated_job['is_cancelled']
-                self._last_cancel_check = now
+        if self._job_is_cancelled:
+            return True
 
-        return result
+        now = datetime.now()
 
-    def run(self):
+        if not (
+            immediate
+            or (self._last_cancel_check is None)
+            or ((now - self._last_cancel_check).total_seconds() >= self._cancel_check_wait)
+        ):
+            return False
+
+        updated_job = job_retrieve(self.context, self.job_pk)
+        self._job_is_cancelled = updated_job['is_cancelled']
+        self._last_cancel_check = now
+
+        return self._job_is_cancelled
+
+    def run(self) -> None:
         """
         Applies the template and executes the job. Raises an exception if it fails.
         """
@@ -880,12 +918,10 @@ class AbstractJobExecutor(Generic[ContractType]):
         except:
             self.log_msg("Failed to execute post-run code:\n%s" % traceback.format_exc())
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns a short description of itself.
 
         :return: the short description
-        :rtype: str
         """
-        return "context=" + str(self.context) + ", workdir=" + self.work_dir
-
+        return f"context={self.context}, workdir={self.work_dir}"

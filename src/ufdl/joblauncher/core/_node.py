@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import Dict, Optional
+
 import psutil
 import socket
 import subprocess
@@ -5,14 +8,12 @@ from ufdl.pythonclient import UFDLServerContext
 from ufdl.pythonclient.functional.core.nodes.hardware import list as list_hardware
 
 
-def to_bytes(s):
+def to_bytes(s: str) -> int:
     """
     Turns the string with suffix of KiB/MiB/GiB into bytes.
 
     :param s: the string (NUM SUFFIX)
-    :type s: str
     :return: the number of bytes
-    :rtype: int
     """
     factor = 1
     if s.endswith(" KiB"):
@@ -30,159 +31,199 @@ def to_bytes(s):
     return int(s) * factor
 
 
-def to_hardware_generation(context, compute):
+@dataclass
+class HardwareGeneration:
+    pk: int
+    name: str
+
+    @staticmethod
+    def from_compute(context: UFDLServerContext, compute: float) -> 'HardwareGeneration':
+        """
+        Turns the compute number into a hardware generation string
+
+        :param context: the server context
+        :param compute: the compute number
+        :return: the hardware generation (pk, name)
+        """
+        match = None
+        for hw in list_hardware(context):
+            if (compute >= hw['min_compute_capability']) and (compute < hw['max_compute_capability']):
+                match = hw
+                break
+
+        if match is not None:
+            return HardwareGeneration(match['pk'], match['generation'])
+        else:
+            raise Exception("Unhandled compute version: " + str(compute))
+
+
+@dataclass
+class Memory:
     """
-    Turns the compute number into a hardware generation string
-
-    :param context: the server context
-    :type context: UFDLServerContext
-    :param compute: the compute number
-    :type compute: float
-    :return: the hardware generation (pk, name)
-    :rtype: dict
+    In bytes.
     """
-    match = None
-    for hw in list_hardware(context):
-        if (compute >= hw['min_compute_capability']) and (compute < hw['max_compute_capability']):
-            match = hw
-            break
+    total: Optional[int] = None
+    used: Optional[int] = None
+    free: Optional[int] = None
 
-    if match is not None:
-        return {'pk': match['pk'], 'name': match['generation']}
-    else:
-        raise Exception("Unhandled compute version: " + str(compute))
+    @staticmethod
+    def try_get_system_memory() -> Optional['Memory']:
+        try:
+            mem = psutil.virtual_memory()
+            return Memory(
+                mem.total,
+                mem.used,
+                mem.free
+            )
+        except:
+            return None
 
 
-def hardware_info(context):
+@dataclass
+class GPU:
+    # E.g. GeForce RTX 2080 Ti
+    model: Optional[str] = None
+
+    # E.g. GeForce
+    brand: Optional[str] = None
+
+    # E.g. GPU-AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE
+    uuid: Optional[str] = None
+
+    # E.g. 00000000:01:00.0
+    bus: Optional[str] = None
+
+    # E.g. 7.5
+    compute: Optional[float] = None
+
+    # Hardware generation
+    generation: Optional[HardwareGeneration] = None
+
+    # Graphics memory
+    memory: Optional[Memory] = None
+
+    # FIXME: ???
+    minor: Optional[int] = None
+
+
+@dataclass
+class HardwareInfo:
     """
-    Collects hardware information with the following keys (memory is in bytes):
-    - memory
-      - total
-      - used
-      - free
-    - driver (NVIDIA driver version, if available)
-    - cuda (CUDA version, if available)
-    - gpus (if available)
-      - device ID (index)
-        - model (GeForce RTX 2080 Ti)
-        - brand (GeForce)
-        - uuid (GPU-AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE)
-        - bus (00000000:01:00.0)
-        - compute (7.5)
-        - generation:
-          - pk
-          - name
-        - memory
-          - total
-          - used
-          - free
-
-    :param context: the server context
-    :type context: UFDLServerContext
-    :return: the hardware info
-    :rtype: dict
+    Hardware configuration relevant to executing jobs.
     """
-    hardware = dict()
-    gpus = dict()
-    has_gpu = False
+    # System memory
+    memory: Optional[Memory] = None
 
-    # ram
-    try:
-        mem = psutil.virtual_memory()
-        hardware['memory'] = dict()
-        hardware['memory']['total'] = mem.total
-        hardware['memory']['used'] = mem.used
-        hardware['memory']['free'] = mem.free
-    except:
-        pass
+    # NVIDIA driver version, if available
+    driver: Optional[str] = None
 
-    # gpu
-    try:
-        res = subprocess.run(["nvidia-container-cli", "info"], stdout=subprocess.PIPE)
-        has_gpu = True
-        lines = res.stdout.decode().split("\n")
-        index = ""
-        minor = ""
-        for line in lines:
-            if ":" in line:
-                parts = line.split(":")
-                for i in range(len(parts)):
-                    parts[i] = parts[i].strip()
-                if "NVRM version" in line:
-                    hardware['driver'] = parts[1]
-                elif "CUDA version" in line:
-                    hardware['cuda'] = parts[1]
-                elif "Device Index" in line:
-                    index = int(parts[1])
-                elif "Device Minor" in line:
-                    minor = int(parts[1])
-                    if not index in gpus:
-                        gpus[index] = dict()
-                elif "Architecture" in line:
-                    gpus[index]['compute'] = float(parts[1])
-                    gpus[index]['generation'] = to_hardware_generation(context, float(parts[1]))
-                elif "Model" in line:
-                    gpus[index]['model'] = parts[1]
-                elif "Brand" in line:
-                    gpus[index]['brand'] = parts[1]
-                elif "GPU UUID" in line:
-                    gpus[index]['uuid'] = parts[1]
-                elif "Bus Location" in line:
-                    gpus[index]['bus'] = ":".join(parts[1:])
-    except:
-        pass
+    # CUDA version, if available
+    cuda: Optional[str] = None
 
-    # gpu memory
-    try:
-        res = subprocess.run(["nvidia-smi", "-q", "-d", "MEMORY"], stdout=subprocess.PIPE)
-        has_gpu = True
-        lines = res.stdout.decode().split("\n")
-        bus = ""
-        fb = False
-        for line in lines:
-            if line.startswith("GPU "):
-                bus = line[4:].strip()
-                continue
-            elif "FB Memory Usage" in line:
-                fb = True
-                continue
-            elif "BAR1 Memory Usage" in line:
-                fb = False
-                continue
-            if not fb:
-                continue
-            if ":" in line:
-                parts = line.split(":")
-                for i in range(len(parts)):
-                    parts[i] = parts[i].strip()
-                key = ""
-                val = ""
-                if "Total" in line:
-                    key = "total"
-                    val = parts[1]
-                elif "Used" in line:
-                    key = "used"
-                    val = parts[1]
-                elif "Free" in line:
-                    key = "free"
-                    val = parts[1]
-                if key != "":
-                    for gpu in gpus.values():
-                        if gpu['bus'] == bus:
-                            if not 'memory' in gpu:
-                                gpu['memory'] = dict()
-                            gpu['memory'][key] = to_bytes(val)
-                            break
-    except:
-        pass
+    # If available, keyed by device ID (index)
+    gpus: Optional[Dict[int, GPU]] = None
 
-    if has_gpu:
-        hardware['gpus'] = gpus
+    @staticmethod
+    def collect(context: UFDLServerContext) -> 'HardwareInfo':
+        """
+        Collects the available information about the running hardware.
 
-    return hardware
+        :param context: the server context, to resolve the GPU generation
+        :return: the hardware info
+        """
+        hardware = HardwareInfo()
+        gpus: Dict[int, GPU] = {}
+        has_gpu = False
+
+        # ram
+        hardware.memory = Memory.try_get_system_memory()
+
+        # gpu
+        try:
+            res = subprocess.run(["nvidia-container-cli", "info"], stdout=subprocess.PIPE)
+            has_gpu = True
+            lines = res.stdout.decode().split("\n")
+            index: int = 0
+            for line in lines:
+                if ":" in line:
+                    parts = line.split(":")
+                    for i in range(len(parts)):
+                        parts[i] = parts[i].strip()
+                    if "NVRM version" in line:
+                        hardware.driver = parts[1]
+                    elif "CUDA version" in line:
+                        hardware.cuda = parts[1]
+                    elif "Device Index" in line:
+                        index = int(parts[1])
+                        if index not in gpus:
+                            gpus[index] = GPU()
+                    elif "Device Minor" in line:
+                        gpus[index].minor = int(parts[1])
+                    elif "Architecture" in line:
+                        gpus[index].compute = float(parts[1])
+                        gpus[index].generation = HardwareGeneration.from_compute(context, float(parts[1]))
+                    elif "Model" in line:
+                        gpus[index].model = parts[1]
+                    elif "Brand" in line:
+                        gpus[index].brand = parts[1]
+                    elif "GPU UUID" in line:
+                        gpus[index].uuid = parts[1]
+                    elif "Bus Location" in line:
+                        gpus[index].bus = ":".join(parts[1:])
+        except:
+            pass
+
+        # gpu memory
+        try:
+            res = subprocess.run(["nvidia-smi", "-q", "-d", "MEMORY"], stdout=subprocess.PIPE)
+            has_gpu = True
+            lines = res.stdout.decode().split("\n")
+            bus = ""
+            fb = False
+            for line in lines:
+                if line.startswith("GPU "):
+                    bus = line[4:].strip()
+                    continue
+                elif "FB Memory Usage" in line:
+                    fb = True
+                    continue
+                elif "BAR1 Memory Usage" in line:
+                    fb = False
+                    continue
+                if not fb:
+                    continue
+                if ":" in line:
+                    parts = line.split(":")
+                    for i in range(len(parts)):
+                        parts[i] = parts[i].strip()
+                    key = ""
+                    val = ""
+                    if "Total" in line:
+                        key = "total"
+                        val = parts[1]
+                    elif "Used" in line:
+                        key = "used"
+                        val = parts[1]
+                    elif "Free" in line:
+                        key = "free"
+                        val = parts[1]
+                    if key != "":
+                        for gpu in gpus.values():
+                            if gpu.bus == bus:
+                                if gpu.memory is None:
+                                    gpu.memory = Memory()
+                                setattr(gpu.memory, key, to_bytes(val))
+                                break
+        except:
+            pass
+
+        if has_gpu:
+            hardware.gpus = gpus
+
+        return hardware
 
 
-def get_ipv4():
+def get_ipv4() -> str:
     """
     Returns the primary IPv4 address.
 
@@ -191,7 +232,6 @@ def get_ipv4():
     License: CC-BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/)
 
     :return: the IP address
-    :rtype: str
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:

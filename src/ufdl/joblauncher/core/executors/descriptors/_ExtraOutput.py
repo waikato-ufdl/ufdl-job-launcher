@@ -26,7 +26,7 @@ class ExtraOutput(Generic[OutputType]):
         return self._name
 
     @property
-    def type(self):
+    def type(self) -> UFDLType[tuple, Any, OutputType]:
         return self._type
 
     def __set__(self, instance: 'AbstractJobExecutor', value: OutputType):

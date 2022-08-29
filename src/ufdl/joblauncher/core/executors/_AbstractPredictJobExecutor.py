@@ -1,16 +1,15 @@
-from typing import Union, Tuple
+from abc import ABC
 
 from ufdl.jobcontracts.standard import Predict
 
-from ufdl.jobtypes.base import String, Boolean
-from ufdl.jobtypes.standard.container import Array
+from ufdl.jobtypes.base import Boolean
 from ufdl.jobtypes.standard.server import DockerImage
 
 from .descriptors import Parameter
 from ._AbstractDockerJobExecutor import AbstractDockerJobExecutor
 
 
-class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict]):
+class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
 
     clear_dataset: bool = Parameter(
         Boolean()

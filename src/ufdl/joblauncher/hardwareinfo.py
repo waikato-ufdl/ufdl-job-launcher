@@ -1,28 +1,43 @@
 import argparse
 import json
 import traceback
+from typing import Callable, Dict, List, Optional
+
 import yaml
-from .core import SYSTEMWIDE_CONFIG, load_config, create_server_context, hardware_info
+
+from ufdl.pythonclient import UFDLServerContext
+
+from ufdl.joblauncher.core import create_server_context, HardwareInfo
+from ufdl.joblauncher.core.config import SYSTEMWIDE_CONFIG, UFDLJobLauncherConfig
+
+SUPPORTED_OUT_FORMATS: Dict[str, Callable[[HardwareInfo], str]] = {
+    "json": lambda info: json.dumps(info, indent=2),
+    "yaml": yaml.dump
+}
 
 
-def output_info(context, out_format, out_file=None):
+def output_info(
+        context: UFDLServerContext,
+        out_format: str,
+        out_file: Optional[str] = None
+):
     """
     Outputs the hardware information.
 
     :param context: the UFDL server context to use
-    :type context: UFDLServerContext
     :param out_format: the output format (json, yaml)
-    :type out_format: str
     :param out_file: the file to write the information to instead of printing it to stdout
-    :type out_file: str
     """
-    info = hardware_info(context)
-    if out_format == "json":
-        info_str = json.dumps(info, indent=2)
-    elif out_format == "yaml":
-        info_str = yaml.dump(info)
-    else:
-        raise Exception("Unhandled output format: %s" % out_format)
+    info = HardwareInfo.collect(context)
+
+    if out_format not in SUPPORTED_OUT_FORMATS:
+        raise ValueError(
+            f"Unhandled output format: {out_format}\n"
+            f"Must be one of: {SUPPORTED_OUT_FORMATS.keys()}"
+        )
+
+    info_str = SUPPORTED_OUT_FORMATS[out_format](info)
+
     if out_file is None:
         print(info_str)
     else:
@@ -30,7 +45,7 @@ def output_info(context, out_format, out_file=None):
             of.write(info_str)
 
 
-def main(args=None):
+def main(args: Optional[List[str]] = None):
     """
     Outputs the hardware info.
     Use -h to see all options.
@@ -46,12 +61,12 @@ def main(args=None):
     parser.add_argument("-F", "--format", dest="format", metavar="FORMAT", default="yaml", choices=["yaml", "json"], help="The format to use for the output of the information.")
     parser.add_argument("-O", "--output", dest="output", metavar="FILE", default=None, help="The file to store the information in, otherwise stdout is used.")
     parsed = parser.parse_args(args=args)
-    config = load_config(parsed.config)
+    config = UFDLJobLauncherConfig(parsed.config)
     context = create_server_context(config)
     output_info(context, parsed.format, out_file=parsed.output)
 
 
-def sys_main():
+def sys_main() -> int:
     """
     Runs the main function using the system cli arguments, and
     returns a system error code.
