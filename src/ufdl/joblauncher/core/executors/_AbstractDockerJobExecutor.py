@@ -1,7 +1,6 @@
 import getpass
 import os
 import re
-import shlex
 from subprocess import CompletedProcess
 from abc import abstractmethod
 from typing import List, Optional, Tuple, Union
@@ -12,7 +11,6 @@ from ufdl.jobtypes.standard.container import Array
 from ufdl.jobtypes.standard.server import DockerImage, DockerImageInstance
 
 from ufdl.pythonclient import UFDLServerContext
-from ufdl.pythonclient.functional.core.dataset import clear as dataset_clear, download as dataset_download
 
 from wai.json.object import Absent
 
@@ -51,12 +49,6 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
     """
     For executing jobs via docker images.
     """
-
-    dataset_options: Union[str, Tuple[str, ...]] = Parameter(
-        Array(String()),
-        String()
-    )
-
     # The configuration of the job's execution
     body: Union[str, Tuple[str, ...]] = Parameter(
         String(),
@@ -209,31 +201,6 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         :return: None if successfully pulled, otherwise subprocess.CompletedProcess
         """
         return self._execute(["docker", "pull", image], always_return=False)
-
-    def _download_dataset(self, pk: int, clear_dataset: bool = False) -> str:
-        """
-        Downloads the dataset.
-
-        :param pk:
-                    The primary key of the dataset to download.
-        :param clear_dataset:
-                    Whether to clear the dataset first.
-        :return:
-                    The archive filename.
-        """
-        # clear dataset
-        if clear_dataset:
-            dataset_clear(self.context, pk)
-
-        # download dataset
-        data = self.job_dir + "/data.zip"
-        options = self.dataset_options
-        self.log_msg("Downloading dataset:", pk, "-> options='" + str(options) + "'", "->", data)
-        with open(data, "wb") as zip_file:
-            for b in dataset_download(self.context, pk, annotations_args=shlex.split(options) if isinstance(options, str) else list(options)):
-                zip_file.write(b)
-
-        return data
 
     def _expand_template(self) -> Union[str, Tuple[str, ...]]:
         """

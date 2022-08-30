@@ -42,7 +42,9 @@ setup(
         "psutil",
         "pyyaml",
         "ufdl.jobtypes",
-        "ufdl.jobcontracts"
+        "ufdl.jobcontracts",
+        "ufdl-annotations-plugin",
+        "wai.annotations==0.7.5"
     ],
     entry_points={
         "console_scripts": [
