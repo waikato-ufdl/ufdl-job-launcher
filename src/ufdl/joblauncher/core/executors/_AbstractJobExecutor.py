@@ -552,10 +552,16 @@ class AbstractJobExecutor(Generic[ContractType]):
                         stdout_list.append(line)
                     if capture_output and (command_progress_parser is not None):
                         try:
-                            last_progress = command_progress_parser.parse(line, last_progress)
+                            progress, progress_metadata = command_progress_parser.parse(line, last_progress)
                         except:
                             command_progress_parser = None
                             self.log_msg("Failed to parse progress output, disabling!", traceback.format_exc())
+                        else:
+                            if progress != last_progress or progress_metadata is not None:
+                                if progress_metadata is None:
+                                    progress_metadata = {}
+                                self.progress(progress, **progress_metadata)
+                            last_progress = progress
                 if self.is_job_cancelled():
                     stdout_list.append("Job was cancelled")
                     result = CompletedProcess(full, 255, stdout=stdout_list, stderr=None)
