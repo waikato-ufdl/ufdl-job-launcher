@@ -14,7 +14,8 @@ def download_dataset(
         domain: str,
         output_dir: str,
         options: Union[str, Tuple[str, ...]],
-        clear_dataset: bool = False
+        clear_dataset: bool = False,
+        unlabelled: Tuple[str, ...] = tuple()
 ) -> None:
     """
     Downloads the dataset.
@@ -39,6 +40,9 @@ def download_dataset(
         "--project", "",
         "--datasets", f"pk:{pk}"
     ]
+
+    if len(unlabelled) != 0:
+        source_options += ["--unlabelled", *unlabelled]
 
     pipeline = ConversionPipelineBuilder.from_options(
         source_options +

@@ -24,6 +24,10 @@ class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
         Boolean()
     )
 
+    unlabelled: Tuple[str, ...] = Parameter(
+        Array(String())
+    )
+
     @property
     def model(self) -> Union[bytes, IO[bytes]]:
         return self[self.contract.model]
@@ -55,7 +59,8 @@ class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
             self.template['domain'],
             output_dir,
             self.dataset_options,
-            self.clear_dataset
+            self.clear_dataset,
+            self.unlabelled
         )
 
     @classmethod
