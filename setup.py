@@ -44,7 +44,7 @@ setup(
         "ufdl.jobtypes",
         "ufdl.jobcontracts",
         "ufdl-annotations-plugin",
-        "wai.annotations==0.7.5"
+        "wai.annotations==0.8.0"
     ],
     entry_points={
         "console_scripts": [
