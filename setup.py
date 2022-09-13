@@ -43,7 +43,6 @@ setup(
         "pyyaml",
         "ufdl.jobtypes",
         "ufdl.jobcontracts",
-        "ufdl-annotations-plugin",
         "wai.annotations==0.8.0"
     ],
     entry_points={
