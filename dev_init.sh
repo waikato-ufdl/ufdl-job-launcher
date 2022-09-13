@@ -142,6 +142,9 @@ check_repository
 REPO="ufdl-python-client"
 check_repository
 
+REPO="ufdl-annotations-plugin"
+check_repository
+
 #############
 # EXECUTION #
 #############
@@ -160,6 +163,9 @@ then
   update_repository
 
   REPO="ufdl-python-client"
+  update_repository
+
+  REPO="ufdl-annotations-plugin"
   update_repository
 
   git pull
@@ -185,6 +191,7 @@ echo "Installing dependencies..."
 ./$VENV/bin/pip install ../ufdl-job-types
 ./$VENV/bin/pip install ../ufdl-job-contracts
 ./$VENV/bin/pip install ../ufdl-python-client
+./$VENV/bin/pip install ../ufdl-annotations-plugin
 ./$VENV/bin/pip install wai.lazypip
 ./$VENV/bin/pip install psutil
 ./$VENV/bin/pip install pyyaml
