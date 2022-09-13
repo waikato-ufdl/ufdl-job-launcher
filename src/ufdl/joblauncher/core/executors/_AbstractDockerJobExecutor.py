@@ -128,7 +128,16 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         if res.returncode > 0:
             return None
 
-        result = res.stdout.decode().strip()
+        stdout = res.stdout
+
+        if stdout is None:
+            return None
+
+        result = (
+            stdout.decode() if isinstance(stdout, bytes)
+            else stdout if isinstance(stdout, str)
+            else stdout[0]
+        ).strip()
         if result.startswith("Docker version"):
             result = result.replace("Docker version ", "")
         if "," in result:

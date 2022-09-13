@@ -500,7 +500,7 @@ class AbstractJobExecutor(Generic[ContractType]):
             stdin: Optional[str] = None,
             hide: Optional[List[str]] = None,
             command_progress_parser: Optional[CommandProgressParser] = None
-    ) -> Optional[CompletedProcess]:
+    ) -> Optional[CompletedProcess[Union[bytes, str, List[str], None]]]:
         """
         Executes the command.
         For updating a job's progress, a progress parser method can be supplied. For a dummy implemented and
@@ -535,7 +535,7 @@ class AbstractJobExecutor(Generic[ContractType]):
                     stdin = stdin + "\n"
                 process = subprocess.Popen(full, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = process.communicate(input=stdin.encode())
-                result = CompletedProcess(full, process.returncode, stdout=stdout, stderr=stderr)
+                result = CompletedProcess[bytes](full, process.returncode, stdout=stdout, stderr=stderr)
             else:
                 stdout_list = []
                 process = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, bufsize=1)
@@ -564,12 +564,12 @@ class AbstractJobExecutor(Generic[ContractType]):
                             last_progress = progress
                 if self.is_job_cancelled():
                     stdout_list.append("Job was cancelled")
-                    result = CompletedProcess(full, 255, stdout=stdout_list, stderr=None)
+                    result = CompletedProcess[Optional[List[str]]](full, 255, stdout=stdout_list, stderr=None)
                 else:
                     retcode = process.wait()
-                    result = CompletedProcess(full, retcode, stdout=stdout_list, stderr=None)
+                    result = CompletedProcess[Optional[List[str]]](full, retcode, stdout=stdout_list, stderr=None)
         except:
-            result = CompletedProcess(full, 255, stdout=None, stderr=traceback.format_exc())
+            result = CompletedProcess[Optional[str]](full, 255, stdout=None, stderr=traceback.format_exc())
 
         self._add_log(self._to_logentry(result, hide))
 
