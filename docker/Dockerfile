@@ -18,6 +18,7 @@ RUN mkdir /ufdl && \
     git clone https://github.com/waikato-ufdl/ufdl-job-contracts.git && \
     git clone https://github.com/waikato-ufdl/ufdl-python-client.git && \
     git clone https://github.com/waikato-ufdl/ufdl-job-launcher.git && \
+    git clone https://github.com/waikato-ufdl/ufdl-annotations-plugin.git && \
     cd /ufdl/ufdl-job-launcher && \
     ./dev_init.sh -y
 
