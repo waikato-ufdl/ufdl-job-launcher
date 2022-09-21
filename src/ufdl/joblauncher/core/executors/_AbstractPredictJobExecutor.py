@@ -1,5 +1,6 @@
 from abc import ABC
-from typing import Tuple, Union
+import shlex
+from typing import List, Tuple, Union
 
 from typing.io import IO
 from ufdl.jobcontracts.standard import Predict
@@ -24,10 +25,6 @@ class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
         Boolean()
     )
 
-    unlabelled: Tuple[str, ...] = Parameter(
-        Array(String())
-    )
-
     @property
     def model(self) -> Union[bytes, IO[bytes]]:
         return self[self.contract.model]
@@ -39,28 +36,38 @@ class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
     def _download_dataset(
             self,
             pk: int,
-            output_dir: str
+            output_dir: str,
+            additional_source_options: Union[str, Tuple[str, ...]]
     ):
         """
-        Downloads the dataset.
+        Downloads a dataset.
 
         :param pk:
                     The primary key of the dataset to download.
         :param output_dir:
                     Where to download the dataset to.
-        :param clear_dataset:
-                    Whether to clear the dataset first.
-        :return:
-                    The archive filename.
+        :param additional_source_options:
+                    Any additional options to the ufdl-annotations-plugin source.
         """
+        # Split the source options into a list
+        options: List[str] = (
+            shlex.split(additional_source_options) if isinstance(additional_source_options, str)
+            else list(additional_source_options)
+        )
+
+        # Append the dataset options parameter
+        options += (
+            shlex.split(self.dataset_options) if isinstance(self.dataset_options, str)
+            else list(self.dataset_options)
+        )
+
         download_dataset(
             self.context,
             pk,
             self.template['domain'],
             output_dir,
-            self.dataset_options,
-            self.clear_dataset,
-            self.unlabelled
+            options,
+            self.clear_dataset
         )
 
     @classmethod

@@ -1,3 +1,4 @@
+import shlex
 from abc import ABC
 from typing import Tuple, Union
 
@@ -35,17 +36,14 @@ class AbstractTrainJobExecutor(AbstractDockerJobExecutor[Train], ABC):
                     The primary key of the dataset to download.
         :param output_dir:
                     Where to download the dataset to.
-        :param clear_dataset:
-                    Whether to clear the dataset first.
-        :return:
-                    The archive filename.
         """
         download_dataset(
             self.context,
             pk,
             self.template['domain'],
             output_dir,
-            self.dataset_options
+            shlex.split(self.dataset_options) if isinstance(self.dataset_options, str)
+            else list(self.dataset_options)
         )
 
     @classmethod
