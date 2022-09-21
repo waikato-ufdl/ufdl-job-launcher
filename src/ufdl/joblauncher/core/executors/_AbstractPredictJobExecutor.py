@@ -37,7 +37,7 @@ class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
             self,
             pk: int,
             output_dir: str,
-            additional_source_options: Union[str, Tuple[str, ...]]
+            additional_source_options: Union[str, Tuple[str, ...]] = tuple()
     ):
         """
         Downloads a dataset.
