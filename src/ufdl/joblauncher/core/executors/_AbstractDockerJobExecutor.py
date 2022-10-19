@@ -3,7 +3,7 @@ import os
 import re
 from subprocess import CompletedProcess
 from abc import abstractmethod
-from typing import List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ufdl.jobtypes.base import String, UFDLJSONType
 from ufdl.jobtypes.standard import PK, Name
@@ -213,12 +213,19 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         """
         return self._execute(["docker", "pull", image], always_return=False)
 
-    def _expand_template(self) -> Union[str, Tuple[str, ...]]:
+    def _expand_template(
+            self,
+            additional_expansions: Dict[str, Any]
+    ) -> Union[str, Tuple[str, ...]]:
         """
-        Expands all parameters in the template code and returns the updated template string.
+        Expands all parameters in the template body and returns the updated template string.
 
-        :return: the expanded template
-        :rtype: str
+        :param additional_expansions:
+                    Any additional parameter expansions to make, from name to value. These
+                    do not override executor/template parameters (i.e. they are ignored if
+                    there is a name collision).
+
+        :return: the expanded template body
         """
         # Get the body template
         result = self.body
@@ -234,6 +241,13 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         parameter_values.update({
             parameter: Parameter.parse_parameter(parameter, (UFDLJSONType(),), self)
             for parameter in self.template['parameters']
+            if parameter not in parameter_values
+        })
+
+        # Add in the given additional expansions
+        parameter_values.update({
+            parameter: value
+            for parameter, value in additional_expansions
             if parameter not in parameter_values
         })
 
