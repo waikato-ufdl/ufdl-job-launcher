@@ -215,7 +215,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
     def _expand_template(
             self,
-            additional_expansions: Dict[str, Any]
+            additional_expansions: Optional[Dict[str, Any]] = None
     ) -> Union[str, Tuple[str, ...]]:
         """
         Expands all parameters in the template body and returns the updated template string.
@@ -245,11 +245,12 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         })
 
         # Add in the given additional expansions
-        parameter_values.update({
-            parameter: value
-            for parameter, value in additional_expansions
-            if parameter not in parameter_values
-        })
+        if additional_expansions is not None:
+            parameter_values.update({
+                parameter: value
+                for parameter, value in additional_expansions
+                if parameter not in parameter_values
+            })
 
         for parameter, value in parameter_values.items():
             # Bool parameters have the true/false replacements defined in the body itself
