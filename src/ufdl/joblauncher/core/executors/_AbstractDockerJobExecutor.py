@@ -60,7 +60,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
             context: UFDLServerContext,
             config: UFDLJobLauncherConfig,
             template: Template,
-            job: Job
+            job: Job,
+            docker_image_type: Optional[DockerImage] = None
     ):
         """
         Initializes the executor with the backend context and configuration.
@@ -76,7 +77,8 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         self._gpu_id = config.general.gpu_id
         self._additional_gpu_flags = []
 
-        docker_image_type = self._extract_domain_type_from_contract(self._contract)
+        if docker_image_type is None:
+            docker_image_type = self._extract_docker_image_type_from_contract(self._contract)
 
         # The docker image to execute the job
         self.docker_image: DockerImageInstance = Parameter(
@@ -87,7 +89,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
     @classmethod
     @abstractmethod
-    def _extract_domain_type_from_contract(cls, contract: ContractType) -> DockerImage:
+    def _extract_docker_image_type_from_contract(cls, contract: ContractType) -> DockerImage:
         """
         Extracts the type of docker image this executor will use from its contract.
 
@@ -96,7 +98,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         :return:
                     The docker-image type required by the executor.
         """
-        raise NotImplementedError(cls._extract_domain_type_from_contract.__qualname__)
+        raise NotImplementedError(cls._extract_docker_image_type_from_contract.__qualname__)
 
     @property
     def use_current_user(self) -> bool:

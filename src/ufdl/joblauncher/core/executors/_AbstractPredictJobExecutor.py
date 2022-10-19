@@ -71,5 +71,5 @@ class AbstractPredictJobExecutor(AbstractDockerJobExecutor[Predict], ABC):
         )
 
     @classmethod
-    def _extract_domain_type_from_contract(cls, contract: Predict) -> DockerImage:
+    def _extract_docker_image_type_from_contract(cls, contract: Predict) -> DockerImage:
         return DockerImage((contract.domain_type, contract.framework_type))
