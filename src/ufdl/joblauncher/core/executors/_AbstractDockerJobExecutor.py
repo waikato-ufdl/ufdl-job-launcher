@@ -248,7 +248,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         if additional_expansions is not None:
             parameter_values.update({
                 parameter: value
-                for parameter, value in additional_expansions
+                for parameter, value in additional_expansions.items()
                 if parameter not in parameter_values
             })
 
