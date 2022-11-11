@@ -145,6 +145,12 @@ check_repository
 REPO="ufdl-annotations-plugin"
 check_repository
 
+REPO="ufdl-job-types"
+check_repository
+
+REPO="ufdl-job-contracts"
+check_repository
+
 #############
 # EXECUTION #
 #############
@@ -166,6 +172,12 @@ then
   update_repository
 
   REPO="ufdl-annotations-plugin"
+  update_repository
+
+  REPO="ufdl-job-types"
+  update_repository
+
+  REPO="ufdl-job-contracts"
   update_repository
 
   git pull
