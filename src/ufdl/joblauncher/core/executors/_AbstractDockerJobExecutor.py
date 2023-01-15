@@ -3,7 +3,7 @@ import os
 import re
 from subprocess import CompletedProcess
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from ufdl.jobtypes.base import String, UFDLJSONType
 from ufdl.jobtypes.standard import PK, Name
@@ -284,33 +284,46 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
         return result
 
-    def _run_image(self, image, docker_args=None, volumes=None, image_args=None, command_progress_parser: Optional[CommandProgressParser] = None):
+    def _run_image(
+            self,
+            image: str,
+            docker_args: Optional[Iterable[str]] = None,
+            volumes: Optional[Iterable[str]] = None,
+            image_args: Optional[Iterable[str]] = None,
+            command_progress_parser: Optional[CommandProgressParser] = None,
+            remove_container_on_exit: bool = True
+    ) -> Optional[CompletedProcess]:
         """
         Runs the image with the specified parameters.
         For updating a job's progress, a progress parser method can be supplied. For a dummy implemented and
         explanation of parameters see: dummy_command_progress_parser
 
-        :param image: the URL of the image to run
-        :type image: str
-        :param docker_args: the arguments for docker (eg: --gpus=all --shm-size 8G -ti -u $(id -u):$(id -g) -e USER=$USER)
-        :type docker_args: list
-        :param volumes: the volumes to map (eg: /some/where/models:/models)
-        :type volumes: list
-        :param image_args: the command and arguments to supply to the docker image for execution
-        :type image_args: list
-        :return: None if successfully executed, otherwise subprocess.CompletedProcess
-        :rtype: subprocess.CompletedProcess
+        :param image:
+                    The URL of the image to run.
+        :param docker_args:
+                    The arguments for docker (eg: --gpus=all --shm-size 8G -ti -u $(id -u):$(id -g) -e USER=$USER).
+        :param volumes:
+                    The volumes to map (eg: /some/where/models:/models).
+        :param image_args:
+                    The command and arguments to supply to the docker image for execution.
+        :param command_progress_parser:
+                    A progress-parser for updating the job's progress by parsing the command's output.
+        :param remove_container_on_exit:
+                    Whether to remove the container once execution completes. Default: True.
+        :return:
+                    None if successfully executed, otherwise subprocess.CompletedProcess.
         """
         cmd = ["docker", "run"]
-        if docker_args is None:
-            docker_args = []
-        docker_args.extend(self._gpu_flags())
+        if docker_args is not None:
+            cmd.extend(docker_args)
+        if remove_container_on_exit and "--rm" not in cmd:
+            cmd.append("--rm")
+        cmd.extend(self._gpu_flags())
         if self.use_current_user:
-            docker_args.extend([
-                "-u", "%d:%d" % (os.getuid(), os.getgid()),
-                "-e", "USER=%s" % getpass.getuser(),
-                      ])
-        cmd.extend(docker_args)
+            cmd.extend([
+                "-u", f"{os.getuid()}:{os.getgid()}",
+                "-e", f"USER={getpass.getuser()}",
+            ])
         if volumes is not None:
             for volume in volumes:
                 cmd.extend(["-v", volume])
