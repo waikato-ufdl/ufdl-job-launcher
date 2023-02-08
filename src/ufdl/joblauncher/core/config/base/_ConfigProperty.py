@@ -1,3 +1,5 @@
+import re
+from os import environ
 from typing import Callable, Generic, Optional, TYPE_CHECKING, Type, TypeVar
 
 if TYPE_CHECKING:
@@ -7,6 +9,11 @@ if TYPE_CHECKING:
 ValueType = TypeVar('ValueType')
 """
 The type of value that the property converts its raw string input into.
+"""
+
+ENVIRONMENT_PATTERN = re.compile(r"\$\{(.*?)}")
+"""
+Matches environment variables enclosed in ${}. E.g. ${MY_ENV_VAR}.
 """
 
 
@@ -46,6 +53,27 @@ class ConfigProperty(Generic[ValueType]):
         """
         # If a value is given, convert it
         if value is not None:
+            # Handle environment variable substitution
+            while True:
+                # See if there is another variable to substitute, breaking if not
+                environment_match = ENVIRONMENT_PATTERN.search(value)
+                if environment_match is None:
+                    break
+
+                # Get the name of the environment variable
+                environment_variable = environment_match[1]
+
+                # Get the value of the variable from the environment, ensuring it exists
+                replacement = environ.get(environment_variable, None)
+                if replacement is None:
+                    raise Exception(
+                        f"No variable '{environment_variable}' found in environment, "
+                        f"expected by property '{self._name}'"
+                    )
+
+                # Replace the variable with its value
+                value.replace(environment_match[0], replacement)
+
             return self._convert(value)
 
         # If this property is required, raise the fact that no value was given
