@@ -56,6 +56,26 @@ class HardwareGeneration:
         else:
             raise Exception("Unhandled compute version: " + str(compute))
 
+    @staticmethod
+    def from_architecture(context: UFDLServerContext, architecture: str) -> 'HardwareGeneration':
+        """
+        Turns the architecture name into a hardware generation string
+
+        :param context: the server context
+        :param architecture: the architecture
+        :return: the hardware generation (pk, name)
+        """
+        match = None
+        for hw in list_hardware(context):
+            if architecture == hw['generation']:
+                match = hw
+                break
+
+        if match is not None:
+            return HardwareGeneration(match['pk'], match['generation'])
+        else:
+            raise Exception("Unhandled architecture: " + str(architecture))
+
 
 @dataclass
 class Memory:
@@ -171,7 +191,49 @@ class HardwareInfo:
                     elif "Bus Location" in line:
                         gpus[index].bus = ":".join(parts[1:])
         except:
-            pass
+            # if nvidia-container-cli is not available, fall back on nvidia-smi
+            try:
+                res = subprocess.run(["nvidia-smi", "-q"], stdout=subprocess.PIPE)
+                has_gpu = True
+                lines = res.stdout.decode().split("\n")
+                gpu = None
+                for line in lines:
+                    if line.startswith("GPU "):
+                        gpu = GPU()
+                        print("new gpu!")
+                    parts = line.split(":")
+                    if "Driver Version" in line:
+                        hardware.driver = parts[1].strip()
+                    elif "CUDA Version" in line:
+                        hardware.cuda = parts[1].strip()
+                    elif "Minor Number" in line:
+                        print("gpu minor", line, parts[1])
+                        try:
+                            index = int(parts[1])
+                        except:
+                            # could be N/A
+                            index = 0
+                        gpu.minor = index
+                        if index not in gpus:
+                            gpus[index] = gpu
+                    elif "Product Architecture" in line:
+                        gpu.generation = HardwareGeneration.from_architecture(context, parts[1].strip())
+                        print(gpu.generation)
+                        for hw in list_hardware(context):
+                            if gpu.generation == hw['generation']:
+                                gpu.compute = hw['min_compute_capability']
+                                break
+                    elif "Product Name" in line:
+                        gpu.model = parts[1].strip()
+                    elif "Product Brand" in line:
+                        gpu.brand = parts[1].strip()
+                    elif "GPU UUID" in line:
+                        gpu.uuid = parts[1].strip()
+                    elif "Bus Id" in line:
+                        gpu.bus = ":".join(parts[1:]).strip()
+            except Exception as e:
+                print(e)
+                pass
 
         # gpu memory
         try:
