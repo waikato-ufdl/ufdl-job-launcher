@@ -217,7 +217,7 @@ class HardwareInfo:
                     elif "Product Architecture" in line:
                         gpu.generation = HardwareGeneration.from_architecture(context, parts[1].strip())
                         for hw in list_hardware(context):
-                            if gpu.generation == hw['generation']:
+                            if gpu.generation.name == hw['generation']:
                                 gpu.compute = hw['min_compute_capability']
                                 break
                     elif "Product Name" in line:
