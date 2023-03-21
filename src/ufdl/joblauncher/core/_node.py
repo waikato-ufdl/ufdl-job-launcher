@@ -200,14 +200,12 @@ class HardwareInfo:
                 for line in lines:
                     if line.startswith("GPU "):
                         gpu = GPU()
-                        print("new gpu!")
                     parts = line.split(":")
                     if "Driver Version" in line:
                         hardware.driver = parts[1].strip()
                     elif "CUDA Version" in line:
                         hardware.cuda = parts[1].strip()
                     elif "Minor Number" in line:
-                        print("gpu minor", line, parts[1])
                         try:
                             index = int(parts[1])
                         except:
@@ -218,7 +216,6 @@ class HardwareInfo:
                             gpus[index] = gpu
                     elif "Product Architecture" in line:
                         gpu.generation = HardwareGeneration.from_architecture(context, parts[1].strip())
-                        print(gpu.generation)
                         for hw in list_hardware(context):
                             if gpu.generation == hw['generation']:
                                 gpu.compute = hw['min_compute_capability']
@@ -232,7 +229,6 @@ class HardwareInfo:
                     elif "Bus Id" in line:
                         gpu.bus = ":".join(parts[1:]).strip()
             except Exception as e:
-                print(e)
                 pass
 
         # gpu memory
