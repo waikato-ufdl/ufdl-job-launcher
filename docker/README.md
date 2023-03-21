@@ -9,13 +9,13 @@ Docker image for running the UFDL job launcher.
 
 * Log into registry using *public* credentials:
 
-  ```commandline
+  ```bash
   docker login -u public -p public public.aml-repo.cms.waikato.ac.nz:443 
   ```
 
 * Pull and run image (adjust volume mappings `-v`):
 
-  ```commandline
+  ```bash
   docker run \
     --net=host \
     -v /var/run/docker.sock:/var/run/docker.sock \
@@ -26,7 +26,7 @@ Docker image for running the UFDL job launcher.
 
 * If need be, remove all containers and images from your system:
 
-  ```commandline
+  ```bash
   docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q) && docker system prune -a
   ```
 
@@ -35,13 +35,13 @@ Docker image for running the UFDL job launcher.
 
 * Build the image from Docker file (from within /path_to/ufdl/image_classification/docker/1.14)
 
-  ```commandline
+  ```bash
   docker build -t ufdl_job_launcher .
   ```
 
 * Run the container
 
-  ```commandline
+  ```bash
   docker run \
     --net=host \
     -v /var/run/docker.sock:/var/run/docker.sock \
@@ -57,13 +57,13 @@ Docker image for running the UFDL job launcher.
 
 * Build
 
-  ```commandline
+  ```bash
   docker build -t ufdl/ufdl_job_launcher:latest .
   ```
   
 * Tag
 
-  ```commandline
+  ```bash
   docker tag \
     ufdl/ufdl_job_launcher:latest \
     public-push.aml-repo.cms.waikato.ac.nz:443/ufdl/ufdl_job_launcher:latest
@@ -71,12 +71,12 @@ Docker image for running the UFDL job launcher.
   
 * Push
 
-  ```commandline
+  ```bash
   docker push public-push.aml-repo.cms.waikato.ac.nz:443/ufdl/ufdl_job_launcher:latest
   ```
   If error "no basic auth credentials" occurs, then run (enter username/password when prompted):
   
-  ```commandline
+  ```bash
   docker login public-push.aml-repo.cms.waikato.ac.nz:443
   ```
   
@@ -84,17 +84,17 @@ Docker image for running the UFDL job launcher.
 
   If image is available in aml-repo and you just want to use it, you can pull using following command and then [run](#run).
 
-  ```commandline
+  ```bash
   docker pull public.aml-repo.cms.waikato.ac.nz:443/ufdl/ufdl_job_launcher:latest
   ```
   If error "no basic auth credentials" occurs, then run (enter username/password when prompted):
   
-  ```commandline
+  ```bash
   docker login public.aml-repo.cms.waikato.ac.nz:443
   ```
   Then tag by running:
   
-  ```commandline
+  ```bash
   docker tag \
     public.aml-repo.cms.waikato.ac.nz:443/ufdl/ufdl_job_launcher:latest \
     ufdl/ufdl_job_launcher:latest
@@ -102,7 +102,7 @@ Docker image for running the UFDL job launcher.
 
 * <a name="run">Run</a>
 
-  ```commandline
+  ```bash
   docker run \
     --net=host \
     -v /var/run/docker.sock:/var/run/docker.sock \
