@@ -65,6 +65,7 @@ class AbstractJobExecutor(Generic[ContractType]):
         :param config: the configuration to use
         """
         self._debug = config.general.debug
+        self._keep_job_dirs = config.general.keep_job_dirs
         self._context = context
         self._work_dir = config.docker.work_dir
         self._cache_dir = config.docker.cache_dir
@@ -855,8 +856,8 @@ class AbstractJobExecutor(Generic[ContractType]):
         except:
             self.log_msg("Failed to finish job %d!\n%s" % (self.job_pk, traceback.format_exc()))
 
-        # clean up job dir
-        if not self._debug:
+        # clean up job dir?
+        if not self._keep_job_dirs:
             self._rmdir(self.job_dir)
         self._job_dir = None
 

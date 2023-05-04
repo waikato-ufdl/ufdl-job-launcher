@@ -11,6 +11,7 @@ class GeneralConfigSection(ConfigSection):
     TODO: Comment property-descriptions.
     """
     debug: bool = ConfigProperty(str2bool)
+    keep_job_dirs: bool = ConfigProperty(str2bool)
     pip_no_cache: bool = ConfigProperty(str2bool)
     compression: int = ConfigProperty(int)
     poll: str = ConfigProperty(enum_of(str, "simple"))
