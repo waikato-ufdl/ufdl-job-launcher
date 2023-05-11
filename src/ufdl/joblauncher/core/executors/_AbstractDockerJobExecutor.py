@@ -213,13 +213,16 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
         """
         return self._execute(["docker", "pull", image], always_return=False)
 
-    def _expand_template(
+    def _expand_parameters(
             self,
+            template_str,
             additional_expansions: Optional[Dict[str, Any]] = None
     ) -> Union[str, Tuple[str, ...]]:
         """
         Expands all parameters in the template body and returns the updated template string.
 
+        :param template_str:
+                    the template string to expand
         :param additional_expansions:
                     Any additional parameter expansions to make, from name to value. These
                     do not override executor/template parameters (i.e. they are ignored if
@@ -227,8 +230,7 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
 
         :return: the expanded template body
         """
-        # Get the body template
-        result = self.body
+        result = template_str
 
         # Get the defined parameters and their values
         parameter_values = {
@@ -283,6 +285,22 @@ class AbstractDockerJobExecutor(AbstractJobExecutor[ContractType]):
                 )
 
         return result
+
+    def _expand_template(
+            self,
+            additional_expansions: Optional[Dict[str, Any]] = None
+    ) -> Union[str, Tuple[str, ...]]:
+        """
+        Expands all parameters in the template body and returns the updated template string.
+
+        :param additional_expansions:
+                    Any additional parameter expansions to make, from name to value. These
+                    do not override executor/template parameters (i.e. they are ignored if
+                    there is a name collision).
+
+        :return: the expanded template body
+        """
+        return self._expand_parameters(self.body, additional_expansions=additional_expansions)
 
     def _run_image(
             self,
