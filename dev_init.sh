@@ -196,7 +196,7 @@ virtualenv -p /usr/bin/$PYTHON ./$VENV
 echo "Installing dependencies..."
 ./$VENV/bin/pip install --upgrade pip
 ./$VENV/bin/pip install --upgrade "setuptools<60"
-./$VENV/bin/pip install Cython
+./$VENV/bin/pip install "cython<3.0.0"
 ./$VENV/bin/pip install numpy
 ./$VENV/bin/pip install --use-deprecated=legacy-resolver wai.annotations
 ./$VENV/bin/pip install tensorflow
