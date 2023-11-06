@@ -113,14 +113,22 @@ REQUIRED=false
 check_executable
 PYTHON38_AVAILABLE=$AVAILABLE
 
-if [ "$PYTHON37_AVAILABLE" = "false" ] && [ "$PYTHON38_AVAILABLE" = "false" ]
+EXEC="python3.10"
+ADDITIONAL="python3.10-dev"
+REQUIRED=false
+check_executable
+PYTHON310_AVAILABLE=$AVAILABLE
+
+if [ "$PYTHON37_AVAILABLE" = "false" ] && [ "$PYTHON38_AVAILABLE" = "false" ] && [ "$PYTHON310_AVAILABLE" = "false" ]
 then
   echo
-  echo "Neither Python 3.7 nor Python3.8 are available!"
+  echo "Neither Python 3.7, 3.8 or 3.10 are available!"
   echo "Install on Debian systems with:"
   echo "  sudo apt-get install python3.7 python3.7-dev"
   echo "or"
   echo "  sudo apt-get install python3.8 python3.8-dev"
+  echo "or"
+  echo "  sudo apt-get install python3.10 python3.10-dev"
   echo
   exit 1
 fi
@@ -131,6 +139,9 @@ then
 elif [ "$PYTHON38_AVAILABLE" = "true" ]
 then
   PYTHON=python3.8
+elif [ "$PYTHON310_AVAILABLE" = "true" ]
+then
+  PYTHON=python3.10
 else
   echo "Don't know what Python executable to use!"
   exit 1
