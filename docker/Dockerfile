@@ -1,8 +1,8 @@
-# Ubuntu 18.04 with Python 3.7
+# Ubuntu 2.04 with Python 3.10
 ARG DOCKER_REGISTRY=public.aml-repo.cms.waikato.ac.nz:443/
-FROM ${DOCKER_REGISTRY}ubuntu:bionic
+FROM ${DOCKER_REGISTRY}ubuntu:jammy
 
-ARG PYTHON=python3.7
+ARG PYTHON=python3.10
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && \
